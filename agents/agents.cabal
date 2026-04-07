@@ -1,0 +1,38 @@
+cabal-version: 3.0
+name:          agents
+version:       0.1.0.0
+synopsis:      Agent primitive for typed agents
+license:       MIT
+build-type:    Simple
+
+library
+  exposed-modules:
+    Agents
+    Env
+    Interpret
+    LLM
+  hs-source-dirs:  .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    hint,
+    process
+
+test-suite test-llm
+  type:            exitcode-stdio-1.0
+  main-is:         TestLLM.hs
+  hs-source-dirs:  test
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents
+
+test-suite test-agent
+  type:            exitcode-stdio-1.0
+  main-is:         TestAgent.hs
+  hs-source-dirs:  test
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents,
+    hint
