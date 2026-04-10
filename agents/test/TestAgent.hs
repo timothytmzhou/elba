@@ -2,10 +2,10 @@ module Main where
 
 import Agents
 import LLM
-import Language.Haskell.Interpreter (ModuleImport(..), ImportList(..), ModuleQualification(..))
 
 main :: IO ()
 main = do
-  let env = []
-  result :: [Int] <- gen defaultConfig env "Give me a list of the first 5 fibonacci numbers"
+  writeFile "/tmp/test_agent_instructions.txt" "Return the first 6 fibonacci numbers as a Haskell list of Int"
+  let agent = mkAgent defaultConfig []
+  let result = agent "Use agent to read /tmp/test_agent_instructions.txt as a String, then follow the instructions" :: [Int]
   putStrLn $ "Result: " ++ show result

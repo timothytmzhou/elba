@@ -9,14 +9,15 @@ library
   exposed-modules:
     Agents
     Env
-    Interpret
     LLM
   hs-source-dirs:  .
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
+    containers,
     hint,
-    process
+    process,
+    template-haskell
 
 test-suite test-llm
   type:            exitcode-stdio-1.0
@@ -34,5 +35,4 @@ test-suite test-agent
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    agents,
-    hint
+    agents
