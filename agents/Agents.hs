@@ -1,3 +1,5 @@
+{-# LANGUAGE Trustworthy #-}
+
 module Agents
   ( Env,
     mkAgent,
@@ -42,8 +44,9 @@ mkAgent config env prompt = unsafePerformIO $ do
   where
     go :: (String -> IO String) -> String -> IO a
     go ask p = do
-      result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell"] $ do
-        typeEnv <- setEnv env ["Prelude", "LLM", "Agents", "Language.Haskell.TH"]
+      result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
+        set [searchPath := []]
+        typeEnv <- setEnv env ["Prelude", "LLM", "Agents", "Language.Haskell.TH.Syntax"]
         let context = buildContext (Proxy :: Proxy a) typeEnv p
         code <- liftIO $ ask context
         liftIO $ putStrLn context >> putStrLn code
