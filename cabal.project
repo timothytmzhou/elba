@@ -1,4 +1,4 @@
 packages:
   agents/
-  examples/basic/
-  examples/files/
+  files/
+  examples/

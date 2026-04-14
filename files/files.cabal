@@ -1,0 +1,28 @@
+cabal-version: 3.0
+name:          files
+version:       0.1.0.0
+synopsis:      Capability-based filesystem monad
+license:       MIT
+build-type:    Simple
+
+library
+  exposed-modules:  RIO
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    directory,
+    filepath,
+    mtl
+
+test-suite test-rio
+  type:             exitcode-stdio-1.0
+  main-is:          TestRIO.hs
+  hs-source-dirs:   tests
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    files,
+    directory,
+    filepath,
+    temporary
