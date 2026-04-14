@@ -16,9 +16,9 @@ executable filesAgent
 
 executable buyAgent
   main-is:          buyAgent.hs
-  other-modules:    Server
   hs-source-dirs:   .
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    agents
+    agents,
+    server

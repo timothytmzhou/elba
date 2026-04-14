@@ -11,7 +11,8 @@ import Data.Typeable (Typeable, typeRep)
 import Env
 import GHC.IO (unsafePerformIO)
 import LLM
-import Language.Haskell.Interpreter
+import Language.Haskell.Interpreter hiding (Extension)
+import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
 
 systemPrompt :: String
@@ -48,11 +49,13 @@ mkAgent config env prompt = unsafePerformIO $ do
   ask <- withSession config {LLM.systemPrompt = Agents.systemPrompt}
   go ask prompt
   where
+    baseModules = ["Prelude", "LLM", "Agents", "Language.Haskell.TH.Syntax"]
     go :: (String -> IO String) -> String -> IO a
     go ask p = do
       result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
         set [searchPath := []]
-        typeEnv <- setEnv env ["Prelude", "LLM", "Agents", "Language.Haskell.TH.Syntax"]
+        set [languageExtensions := map (Hint.UnknownExtension . show) (extensions env)]
+        typeEnv <- setEnv env baseModules
         let context = buildContext (Proxy :: Proxy a) typeEnv p
         code <- liftIO $ ask context
         liftIO $ putStrLn context >> putStrLn code

@@ -1,4 +1,5 @@
 packages:
   agents/
   files/
+  server/
   examples/

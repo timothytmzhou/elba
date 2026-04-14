@@ -1,13 +1,19 @@
 {-# LANGUAGE LinearTypes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
+
 module Main where
 
 import Agents (mkAgent)
+import Env (Extension (LinearTypes), defEnv, extensions, modules)
 import LLM (defaultConfig)
 import Server
 
 main :: IO ()
 main = do
-  let agent = mkAgent defaultConfig ['buy, ''ServerRequest]
-  let task :: Cap %1 -> ServerRequest () = agent "buy two apples"
-  runRequest $ task Cap
+  let env =
+        defEnv
+          { modules = ["Server"],
+            extensions = [LinearTypes]
+          }
+  let agent = mkAgent defaultConfig env
+  let task = agent "buy two apples" :: Cap %1 -> ServerRequest ()
+  runRequest (task Cap)

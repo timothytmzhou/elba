@@ -1,4 +1,5 @@
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE Trustworthy #-}
 
 module Server
   ( Cap (..),
