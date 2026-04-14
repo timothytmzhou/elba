@@ -1,3 +1,5 @@
+{-# LANGUAGE Trustworthy #-}
+
 module RIO
   ( RIO,
     runRIO,

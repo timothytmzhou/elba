@@ -1,14 +1,10 @@
-.PHONY: run
+.PHONY: run build
 
-STAMP := agents/.install-stamp
-SRCS := $(wildcard agents/*.hs) agents/agents.cabal
+build:
+	cabal build --write-ghc-environment-files=always all
 
-$(STAMP): $(SRCS)
-	cd agents && cabal install --lib agents --force-reinstalls
-	@touch $@
-
-run: $(STAMP)
-	cd agents && cabal run $(filter-out $@,$(MAKECMDGOALS))
+run: build
+	cabal run $(filter-out $@,$(MAKECMDGOALS))
 
 %:
 	@:

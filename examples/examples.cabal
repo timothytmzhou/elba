@@ -1,0 +1,24 @@
+cabal-version: 3.0
+name:          examples
+version:       0.1.0.0
+synopsis:      Examples of using the agents primitive
+license:       MIT
+build-type:    Simple
+
+executable filesAgent
+  main-is:          filesAgent.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents,
+    files
+
+executable buyAgent
+  main-is:          buyAgent.hs
+  other-modules:    Server
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents

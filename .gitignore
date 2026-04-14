@@ -6,3 +6,4 @@ dist-newstyle/
 TODO.md
 CLAUDE.md
 .install-stamp
+.ghc.environment.*
