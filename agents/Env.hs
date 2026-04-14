@@ -21,7 +21,9 @@ import Language.Haskell.TH.Syntax
 type Env = [Name]
 
 newtype TypeEnv = TypeEnv (Map String String)
-  deriving (Show)
+
+instance Show TypeEnv where
+  show (TypeEnv m) = unlines [name ++ " :: " ++ ty | (name, ty) <- Map.toList m]
 
 setEnv :: Env -> [String] -> Interpreter TypeEnv
 setEnv env modules = do

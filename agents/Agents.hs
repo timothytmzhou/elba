@@ -17,15 +17,21 @@ import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
 systemPrompt :: String
 systemPrompt =
   unlines
-    [ "You are a Haskell code generator. Output ONLY a single Haskell expression, nothing else.",
+    [ "You generate Haskell code.",
+      "Output exactly one valid Haskell expression and nothing else. The expression may span multiple lines (e.g. do-blocks, let-bindings).",
       "",
-      "You also have a special function:",
+      "A special function is available:",
+      "",
       "  agent :: String -> a",
-      "agent takes a prompt and produces a value of whatever type the call site requires.",
-      "Use agent when a decision depends on a runtime value not known at generation time.",
+      "",
+      "At runtime, agent will query you to return a Haskell expression of the required type.",
+      "",
+      "You can use agent when you need to make a subsequent decision based on a value that will only be known at runtime.",
+      "You must construct the overall Haskell expression yourself.",
+      "Do not delegate the entire computation to agent.",
       "",
       "You will be supplied with a target type and a list of allowed functions.",
-      "You MUST produce an expression of that type, using those functions as well as anything from Prelude."
+      "You MUST produce an expression of that type, using those functions as well as Prelude."
     ]
 
 buildContext :: forall a. (Typeable a) => Proxy a -> TypeEnv -> String -> String
