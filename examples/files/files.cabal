@@ -7,7 +7,7 @@ build-type:    Simple
 
 library
   exposed-modules:  RIO
-  hs-source-dirs:   .
+  hs-source-dirs:   lib
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
@@ -15,10 +15,20 @@ library
     filepath,
     mtl
 
+executable files-agent
+  main-is:          FilesAgent.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents,
+    files,
+    directory
+
 test-suite test-rio
   type:             exitcode-stdio-1.0
   main-is:          TestRIO.hs
-  hs-source-dirs:   tests
+  hs-source-dirs:   test
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,

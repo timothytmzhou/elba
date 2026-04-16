@@ -1,5 +1,5 @@
 cabal-version: 3.0
-name:          server
+name:          linear
 version:       0.1.0.0
 synopsis:      Capability-based server request monad
 license:       MIT
@@ -7,6 +7,15 @@ build-type:    Simple
 
 library
   exposed-modules:  Server
-  hs-source-dirs:   .
+  hs-source-dirs:   lib
   default-language: GHC2024
   build-depends:    base >= 4.20 && < 5
+
+executable buy-agent
+  main-is:          BuyAgent.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    agents,
+    linear
