@@ -1,12 +1,15 @@
 module Main where
 
 import Agents (mkAgent)
+import Control.Exception (try)
 import Env (defEnv, modules)
 import LLM (defaultConfig)
 import RIO
+import System.Directory (createDirectoryIfMissing)
 
 main :: IO ()
 main = do
+  createDirectoryIfMissing True "/tmp/sandbox"
   writeFile "/tmp/sandbox/message.txt" "Hello!"
   let env = defEnv {modules = ["RIO"]}
   let fileAgent = mkAgent defaultConfig env
@@ -14,5 +17,7 @@ main = do
   result <- runRIO "/tmp/sandbox" task
   putStrLn result
   let insecureTask = fileAgent "Read /etc/passwd and return its contents" :: RIO String
-  result <- runRIO "tmp/sandbox" insecureTask
-  putStrLn result
+  result <- try $ runRIO "/tmp/sandbox" insecureTask
+  case result of
+    Left (PathEscape path) -> putStrLn $ "Blocked access to: " ++ path
+    Right _ -> pure ()

@@ -12,7 +12,8 @@ executable filesAgent
   build-depends:
     base >= 4.20 && < 5,
     agents,
-    files
+    files,
+    directory
 
 executable buyAgent
   main-is:          buyAgent.hs
