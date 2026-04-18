@@ -8,10 +8,9 @@ module Env
   )
 where
 
-import Data.Char (isLower)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (fromJust, listToMaybe, mapMaybe)
+import Data.Maybe (fromJust)
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.TH
   ( Name,
@@ -19,7 +18,7 @@ import Language.Haskell.TH
     nameModule,
     nameSpace,
   )
-import Language.Haskell.TH.Syntax (Extension (..), NameSpace (VarName))
+import Language.Haskell.TH.Syntax (Extension (..), NameSpace (DataName, VarName))
 
 data Env = Env
   { names :: [Name],
@@ -36,34 +35,46 @@ instance Show TypeEnv where
   show (TypeEnv m) = unlines [name ++ " :: " ++ ty | (name, ty) <- Map.toList m]
 
 setEnv :: Env -> [ModuleName] -> Interpreter TypeEnv
-setEnv env silentModules = do
-  setImportsF $ importsFromNames ++ openImports (modules env) ++ openImports silentModules
-  importsSigs <- typeSigs importedBaseNames
-  moduleSigs <- concat <$> mapM moduleValueSigs (modules env)
-  pure $ TypeEnv (Map.fromList (importsSigs ++ moduleSigs))
-  where
-    importsFromNames = nameImports (names env)
-    openImports ms = [ModuleImport m NotQualified NoImportList | m <- ms]
-    importedBaseNames = [nameBase n | n <- names env, isValue n]
-    isValue n = nameSpace n == Just VarName
+setEnv Env {names, modules} silentModules = do
+  let namedImports = importNames names
+  let moduleImports = importModules (modules ++ silentModules)
+  setImportsF (namedImports ++ moduleImports)
 
-typeSigs :: [String] -> Interpreter [(String, String)]
-typeSigs names = do
-  types <- mapM typeOf names
-  pure (zip names types)
+  let namedValues = listNamedValues names
+  moduleValues <- listModuleValues modules
 
-moduleValueSigs :: ModuleName -> Interpreter [(String, String)]
-moduleValueSigs m = do
-  exports <- getModuleExports m
-  let names = [n | Fun n <- exports]
-  typeSigs names
+  sigs <- typeSigs (namedValues ++ moduleValues)
+  pure (TypeEnv (Map.fromList sigs))
 
-nameImports :: [Name] -> [ModuleImport]
-nameImports names =
+importNames :: [Name] -> [ModuleImport]
+importNames names =
   [ mkImport m bases
-  | (m, bases) <- groupByFst $ map splitName names
+  | (m, bases) <- groupByFst (map splitName names)
   ]
   where
     mkImport m bases = ModuleImport m NotQualified (ImportList bases)
     splitName n = (fromJust (nameModule n), nameBase n)
     groupByFst = Map.toList . Map.fromListWith (++) . map (\(k, v) -> (k, [v]))
+
+importModules :: [ModuleName] -> [ModuleImport]
+importModules ms = [ModuleImport m NotQualified NoImportList | m <- ms]
+
+listNamedValues :: [Name] -> [String]
+listNamedValues ns = [nameBase n | n <- ns, isValue n]
+  where
+    isValue n = nameSpace n `elem` [Just VarName, Just DataName]
+
+listModuleValues :: [ModuleName] -> Interpreter [String]
+listModuleValues ms = do
+  exportLists <- mapM getModuleExports ms
+  let exports = concat exportLists
+  pure [n | e <- exports, n <- valueNamesOf e]
+  where
+    valueNamesOf (Fun n) = [n]
+    valueNamesOf (Data _ ctors) = ctors
+    valueNamesOf (Class _ methods) = methods
+
+typeSigs :: [String] -> Interpreter [(String, String)]
+typeSigs names = do
+  types <- mapM typeOf names
+  pure (zip names types)
