@@ -49,7 +49,7 @@ mkAgent config env prompt = unsafePerformIO $ do
   ask <- withSession config {LLM.systemPrompt = Agents.systemPrompt}
   go ask prompt
   where
-    baseModules = ["Prelude", "LLM", "Agents", "Language.Haskell.TH.Syntax"]
+    baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
     go :: (String -> IO String) -> String -> IO a
     go ask p = do
       result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
@@ -63,4 +63,9 @@ mkAgent config env prompt = unsafePerformIO $ do
       case result of
         Left err -> error $ show err
         Right f -> pure (f config env)
-    wrapper = (++) "\\config env -> let agent prompt = mkAgent config env prompt in "
+    wrapper =
+      (++)
+        "\\config env -> \
+        \let agent :: Typeable a => String -> a; \
+        \    agent prompt = mkAgent config env prompt \
+        \in "
