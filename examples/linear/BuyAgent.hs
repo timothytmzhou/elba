@@ -3,6 +3,7 @@
 module Main where
 
 import Agents (mkAgent)
+import Control.Exception (SomeException, catch)
 import Env (Extension (LinearTypes), defEnv, extensions, modules)
 import LLM (defaultConfig)
 import Server
@@ -15,5 +16,8 @@ main = do
             extensions = [LinearTypes]
           }
   let agent = mkAgent defaultConfig env
-  let task = agent "buy two apples" :: Cap %1 -> ServerRequest ()
-  runRequest (task Cap)
+  let authorized = agent "buy one apple" :: Auth ()
+  let unauthorized = agent "buy two apples." :: Auth ()
+  runWithOneAuthorization authorized
+  runWithOneAuthorization unauthorized
+    `catch` \(_ :: SomeException) -> putStrLn "unauthorized block"
