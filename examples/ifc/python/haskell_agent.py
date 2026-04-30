@@ -45,6 +45,9 @@ class HaskellAgentPipeline(BasePipelineElement):
 
     def __init__(self, exe_path: str) -> None:
         self.exe_path = exe_path
+        # Mutated by the driver (run_eval.py) before each task to point the
+        # Haskell-side JSONL log at a per-task path; left as None to disable.
+        self.log_path: str | None = None
 
     def query(
         self,
@@ -54,11 +57,14 @@ class HaskellAgentPipeline(BasePipelineElement):
         messages: Sequence[ChatMessage] = [],
         extra_args: dict = {},
     ) -> tuple[str, FunctionsRuntime, Env, Sequence[ChatMessage], dict]:
+        cmd = [self.exe_path]
+        if self.log_path is not None:
+            cmd += ["--log-path", self.log_path]
         # stderr is inherited so Haskell-side traces (the agents/Agents.hs debug
         # output of context + emitted code, plus crash dumps) appear directly in
         # the eval log.
         proc = subprocess.Popen(
-            [self.exe_path],
+            cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,

@@ -10,17 +10,23 @@ library
     Agents
     Env
     LLM
+    Log
+
   hs-source-dirs:  .
   default-language: GHC2024
   build-depends:
     mtl ^>=2.3.1,
+    aeson,
     base >= 4.20 && < 5,
+    bytestring,
     containers,
+    exceptions,
     filepath,
     hint,
     mtl,
     process,
-    template-haskell
+    template-haskell,
+    time
 
 test-suite test-llm
   type:            exitcode-stdio-1.0

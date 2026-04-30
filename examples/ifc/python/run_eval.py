@@ -93,6 +93,14 @@ def main() -> int:
     results: list[tuple[str, bool, bool]] = []
     with OutputLogger(logdir=str(logdir) if logdir else None):
         for task_id in task_ids:
+            # Place the Haskell-side agent log next to AgentDojo's none.json
+            # for the same task: <logdir>/haskell-agent/<suite>/<task>/none/agent.log
+            if logdir:
+                agent_log_path = (
+                    logdir / pipeline.name / DEFAULT_SUITE / task_id / "none" / "agent.log"
+                )
+                agent_log_path.parent.mkdir(parents=True, exist_ok=True)
+                pipeline.log_path = str(agent_log_path)
             task = suite.get_user_task_by_id(task_id)
             try:
                 utility, security = run_task_without_injection_tasks(
