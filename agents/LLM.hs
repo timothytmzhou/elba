@@ -1,27 +1,33 @@
 module LLM
-  ( Config(..)
+  ( Config (..)
   , defaultConfig
   , withSession
   ) where
 
-import           Data.IORef     (newIORef, readIORef, writeIORef)
-import           System.Process (readProcess)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import System.Process (readProcess)
 
-data Config = Config {
-  modelName    :: Maybe String,
-  seed         :: Integer,
-  systemPrompt :: String
-}
+data Config = Config
+  { modelName    :: Maybe String
+  , seed         :: Integer
+  , systemPrompt :: String
+  , logPath      :: Maybe FilePath
+  -- ^ JSONL log destination for the agent loop. Nothing disables logging.
+  , maxAttempts  :: Int
+  -- ^ Compile retries per mkAgent call. >= 1; first attempt counts.
+  }
 
 defaultConfig :: Config
-defaultConfig = Config {
-  modelName = Just "gpt-4.1",
-  seed = 0,
-  systemPrompt = ""
-}
+defaultConfig = Config
+  { modelName    = Just "gpt-5.4"
+  , seed         = 0
+  , systemPrompt = ""
+  , logPath      = Nothing
+  , maxAttempts  = 3
+  }
 
 toArgs :: Config -> [String]
-toArgs Config{modelName, seed} = modelArgs ++ seedArgs
+toArgs Config {modelName, seed} = modelArgs ++ seedArgs
   where
     modelArgs = case modelName of
       Nothing   -> []

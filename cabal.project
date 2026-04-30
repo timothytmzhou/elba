@@ -2,3 +2,4 @@ packages:
   agents/
   examples/files/
   examples/linear/
+  examples/ifc/

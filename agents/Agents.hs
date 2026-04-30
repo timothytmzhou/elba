@@ -14,6 +14,7 @@ import LLM
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
+import System.IO (hPutStrLn, stderr)
 
 systemPrompt :: String
 systemPrompt =
@@ -58,7 +59,7 @@ mkAgent config env prompt = unsafePerformIO $ do
         typeEnv <- setEnv env baseModules
         let context = buildContext (Proxy :: Proxy a) typeEnv p
         code <- liftIO $ ask context
-        liftIO $ putStrLn context >> putStrLn code
+        liftIO $ hPutStrLn stderr context >> hPutStrLn stderr code
         interpret (wrapper code) (as :: Config -> Env -> a)
       case result of
         Left err -> error $ show err

@@ -1,0 +1,33 @@
+cabal-version: 3.0
+name:          ifc
+version:       0.1.0.0
+synopsis:      LIO-based bindings for AgentDojo's slack default suite
+license:       MIT
+build-type:    Simple
+
+library
+  exposed-modules:
+    Bridge
+    Slack
+    Web
+
+  hs-source-dirs:   lib
+  default-language: GHC2024
+  build-depends:
+    aeson,
+    base >= 4.20 && < 5,
+    bytestring,
+    containers,
+    lio,
+    text
+
+executable agentdojo-slack
+  main-is:          Main.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    agents,
+    base >= 4.20 && < 5,
+    ifc,
+    lio,
+    template-haskell

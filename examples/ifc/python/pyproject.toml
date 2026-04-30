@@ -1,0 +1,15 @@
+[project]
+name = "agentdojo-haskell-bridge"
+version = "0.1.0"
+description = "Python side of the typed-agents <-> AgentDojo slack-suite bridge"
+requires-python = ">=3.11"
+dependencies = [
+    "agentdojo>=0.1.30",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["haskell_agent", "run_eval"]

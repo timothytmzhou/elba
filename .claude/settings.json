@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cabal build *)",
+      "Bash(cargo build *)",
+      "Bash(cabal test *)",
+      "Bash(make build *)",
+      "Bash(cargo test *)"
+    ]
+  }
+}
