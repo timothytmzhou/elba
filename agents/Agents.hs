@@ -116,9 +116,11 @@ mkAgent config env userPrompt = unsafePerformIO $
           liftIO (logEvent lg (Failure errStr))
           error errStr
 
+    -- Trailing \n: the LLM emission is appended verbatim; without it, multi-line
+    -- code starts on our prefix line and breaks Haskell's offside rule.
     wrapper =
       (++)
         "\\config env -> \
         \let agent :: Typeable a => String -> a; \
         \    agent prompt = mkAgent config env prompt \
-        \in "
+        \in\n"

@@ -23,6 +23,8 @@ module Slack
   , mkSlack
   , user
   , channel
+  , userName
+  , channelName
   , getChannels
   , addUserToChannel
   , readChannelMessages
@@ -85,6 +87,12 @@ user = principal
 
 channel :: String -> Channel
 channel = principal
+
+userName :: User -> String
+userName = BS.unpack . principalName
+
+channelName :: Channel -> String
+channelName = BS.unpack . principalName
 
 -- Tool functions: each is a thin wrapper that lifts the bridge call into DC.
 -- Label checks (taint, guardAlloc) are deliberately absent in the baseline.
