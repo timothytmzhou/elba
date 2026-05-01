@@ -11,7 +11,8 @@
 
 module Slack
   ( -- Re-exports so the agent's type ascription `Slack -> Web -> DC String`
-    -- can be typechecked by hint, which expands DC to LIO DCLabel.
+    -- can be typechecked by hint, which expands `DC` to `LIO DCLabel`.
+    -- User and Channel are newtypes so they don't expand to Principal.
     LIO
   , DCLabel
   , DC
@@ -50,9 +51,11 @@ import LIO.TCB (ioTCB)
 
 type DC = LIO DCLabel
 
-type User = Principal
+newtype User = User Principal
+  deriving (Eq, Ord, Show)
 
-type Channel = Principal
+newtype Channel = Channel Principal
+  deriving (Eq, Ord, Show)
 
 type Body = String
 
@@ -83,16 +86,16 @@ mkSlack br = do
   pure Slack {..}
 
 user :: String -> User
-user = principal
+user = User . principal
 
 channel :: String -> Channel
-channel = principal
+channel = Channel . principal
 
 userName :: User -> String
-userName = BS.unpack . principalName
+userName (User p) = BS.unpack (principalName p)
 
 channelName :: Channel -> String
-channelName = BS.unpack . principalName
+channelName (Channel p) = BS.unpack (principalName p)
 
 -- Tool functions: each is a thin wrapper that lifts the bridge call into DC.
 -- Label checks (taint, guardAlloc) are deliberately absent in the baseline.
@@ -185,15 +188,21 @@ getUsersInChannel s c =
       "get_users_in_channel"
       (object ["channel" .= c])
 
--- Orphan instances for Principal and Message — required to ship User/Message
--- through the JSON-RPC. Confined to this Trustworthy module; not visible to the
--- agent because it imports Slack but does not see Aeson.
+-- JSON instances for shipping User/Channel/Message through the JSON-RPC.
+-- Newtype wrappers serialise as plain strings so the Python side sees the
+-- same shape it would for a `str`.
 
-instance ToJSON Principal where
-  toJSON p = A.String (T.pack (BS.unpack (principalName p)))
+instance ToJSON User where
+  toJSON (User p) = A.String (T.pack (BS.unpack (principalName p)))
 
-instance FromJSON Principal where
-  parseJSON = withText "Principal" (pure . principal . T.unpack)
+instance FromJSON User where
+  parseJSON = withText "User" (pure . User . principal . T.unpack)
+
+instance ToJSON Channel where
+  toJSON (Channel p) = A.String (T.pack (BS.unpack (principalName p)))
+
+instance FromJSON Channel where
+  parseJSON = withText "Channel" (pure . Channel . principal . T.unpack)
 
 instance ToJSON Message where
   toJSON Message {..} =

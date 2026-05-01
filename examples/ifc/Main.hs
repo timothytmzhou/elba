@@ -31,6 +31,7 @@ agentEnv =
        , 'channel
        , 'userName
        , 'channelName
+       , 'Message
        , 'sender
        , 'recipient
        , 'body
