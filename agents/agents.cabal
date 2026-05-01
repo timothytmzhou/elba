@@ -5,6 +5,9 @@ synopsis:      Agent primitive for typed agents
 license:       MIT
 build-type:    Simple
 
+extra-source-files:
+  SystemPrompt.md
+
 library
   exposed-modules:
     Agents

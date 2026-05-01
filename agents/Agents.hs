@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 
 module Agents
@@ -14,51 +15,22 @@ import LLM
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
+import Language.Haskell.TH (runIO)
+import Language.Haskell.TH.Syntax qualified as TH
+import System.FilePath (takeDirectory, (</>))
 import Log (Event (..), Log, logEvent, withLog)
 
+-- The prompt body lives in SystemPrompt.md so it can be edited as prose.
+-- `addDependentFile` triggers a rebuild whenever that file changes.
 systemPrompt :: String
 systemPrompt =
-  unlines
-    [ "You generate Haskell code."
-    , "Output exactly one valid Haskell expression and nothing else. The expression may span multiple lines (e.g. do-blocks, let-bindings)."
-    , ""
-    , "You have two helpers for delegating decisions to another LLM round:"
-    , ""
-    , "  agent :: Typeable a => String -> a"
-    , "  observe :: (Show a, Typeable b) => a -> String -> b"
-    , ""
-    , "`agent` runs another LLM turn and returns a value of the annotated type."
-    , "Always annotate, e.g. `agent \"...\" :: Int`. Without the annotation,"
-    , "GHC cannot infer the type and compilation fails."
-    , ""
-    , "`observe` is the preferred form when you have runtime data to reason"
-    , "about. After collecting data via tool calls, observe it:"
-    , ""
-    , "    chans <- getChannels slack"
-    , "    let target = observe chans \"Pick the channel whose name starts with External\" :: Channel"
-    , "    sendChannelMessage slack target \"Hi\""
-    , ""
-    , "or:"
-    , ""
-    , "    msgs <- readInbox slack alice"
-    , "    let summary = observe msgs \"Summarize the messages from Bob\" :: String"
-    , ""
-    , "Use `agent` for runtime decisions that don't depend on a value you've"
-    , "already fetched (e.g. picking a friendly greeting). Use `observe`"
-    , "whenever the decision depends on data \8212 it lets the LLM see the data"
-    , "through `show`."
-    , ""
-    , "Do not delegate the entire computation to `agent`/`observe`. Construct"
-    , "the structure yourself; let them fill in data-dependent values."
-    , ""
-    , "If you receive a follow-up message containing a GHC error, your previous"
-    , "code did not compile. Re-emit a single corrected Haskell expression of"
-    , "the same target type, and nothing else."
-    , ""
-    , "You will be supplied with a target type and a list of allowed functions."
-    , "You MUST produce an expression of that type, using those functions as"
-    , "well as Prelude."
-    ]
+  $( do
+      loc <- TH.location
+      let path = takeDirectory (TH.loc_filename loc) </> "SystemPrompt.md"
+      TH.addDependentFile path
+      contents <- runIO (readFile path)
+      TH.lift contents
+   )
 
 buildContext :: forall a. (Typeable a) => Proxy a -> TypeEnv -> String -> String
 buildContext proxy typeEnv task =
@@ -138,5 +110,5 @@ mkAgent config env userPrompt = unsafePerformIO $
         \let agent :: Typeable a => String -> a; \
         \    agent prompt = mkAgent config{maxDepth = maxDepth config - 1} env prompt; \
         \    observe :: (Show a, Typeable b) => a -> String -> b; \
-        \    observe v p = agent (p ++ \"\\n\\nObserved value:\\n\" ++ show v) \
+        \    observe v p = agent (\"Input value:\\n\" ++ show v ++ \"\\n\\nTask: \" ++ p) \
         \in\n"

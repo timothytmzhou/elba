@@ -17,17 +17,13 @@ import Data.Aeson (ToJSON (..), encode, object, (.=))
 import Data.ByteString.Lazy qualified as BSL
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.Time.Format.ISO8601 (iso8601Show)
-import System.IO
-  ( BufferMode (LineBuffering)
-  , Handle
-  , IOMode (AppendMode)
-  , hClose
-  , hSetBuffering
-  , openFile
-  )
+import System.IO (IOMode (AppendMode), withFile)
 
 -- Nothing when logPath was unset; logEvent is then a no-op.
-newtype Log = Log {logHandle :: Maybe Handle}
+-- We hold the path (not a handle) and open per-event so that recursive
+-- mkAgent calls don't contend on a single long-lived handle (GHC's
+-- file-locking semantics would otherwise reject the second open).
+newtype Log = Log {logPath :: Maybe FilePath}
 
 data Event
   = Request {systemPrompt :: String, userPrompt :: String, requiredType :: String}
@@ -56,20 +52,15 @@ instance ToJSON Event where
       object ["kind" .= ("success" :: String)]
 
 withLog :: Maybe FilePath -> (Log -> IO a) -> IO a
-withLog Nothing action = action (Log Nothing)
-withLog (Just path) action = do
-  h <- openFile path AppendMode
-  hSetBuffering h LineBuffering
-  result <- action (Log (Just h))
-  hClose h
-  pure result
+withLog mp action = action (Log mp)
 
 logEvent :: Log -> Event -> IO ()
 logEvent (Log Nothing) _ = pure ()
-logEvent (Log (Just h)) ev = do
+logEvent (Log (Just path)) ev = do
   ts <- getCurrentTime
   let entry = object ["ts" .= iso8601Time ts, "event" .= ev]
-  BSL.hPutStr h (encode entry <> "\n")
+  withFile path AppendMode $ \h ->
+    BSL.hPut h (encode entry <> "\n")
 
 iso8601Time :: UTCTime -> String
 iso8601Time = iso8601Show
