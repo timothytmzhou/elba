@@ -11,6 +11,7 @@ library
     Env
     LLM
     Log
+    TH
 
   hs-source-dirs:  .
   default-language: GHC2024

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main where
 
@@ -6,49 +6,42 @@ import Agents (mkAgent)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
-import LIO (LIO, LIOState (..), evalLIO)
+import LIO (LIOState (..), evalLIO)
 import LIO.DCLabel (DCLabel, dcPublic)
 import LLM (Config (..), defaultConfig)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import Slack
 import System.Environment (getArgs)
+import TH (addTools)
 import Web
 
 agentEnv :: Env
 agentEnv =
-  defEnv
-    { names =
-        [ 'getChannels
-        , 'addUserToChannel
-        , 'readChannelMessages
-        , 'readInbox
-        , 'sendDirectMessage
-        , 'sendChannelMessage
-        , 'inviteUserToSlack
-        , 'removeUserFromSlack
-        , 'getUsersInChannel
-        , 'user
-        , 'channel
-        , 'userName
-        , 'channelName
-        , ''Slack
-        , ''User
-        , ''Channel
-        , ''Body
-        , ''Message
-        , 'sender
-        , 'recipient
-        , 'body
-        , 'getWebpage
-        , 'postWebpage
-        , ''Web
-        , ''Url
-        , ''DC
-        , ''LIO
-        , ''DCLabel
-        ]
-    , extensions = [OverloadedStrings]
-    }
+  $( addTools
+       [ 'getChannels
+       , 'addUserToChannel
+       , 'readChannelMessages
+       , 'readInbox
+       , 'sendDirectMessage
+       , 'sendChannelMessage
+       , 'inviteUserToSlack
+       , 'removeUserFromSlack
+       , 'getUsersInChannel
+       , 'user
+       , 'channel
+       , 'userName
+       , 'channelName
+       , 'sender
+       , 'recipient
+       , 'body
+       , 'getWebpage
+       , 'postWebpage
+       ]
+   )
+    defEnv
+      { silentModules = ["Slack", "Web", "LIO"]
+      , extensions = [OverloadedStrings]
+      }
 
 initialState :: LIOState DCLabel
 initialState = LIOState {lioLabel = dcPublic, lioClearance = dcPublic}

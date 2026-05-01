@@ -100,6 +100,7 @@ def main() -> int:
                     logdir / pipeline.name / DEFAULT_SUITE / task_id / "none" / "agent.log"
                 )
                 agent_log_path.parent.mkdir(parents=True, exist_ok=True)
+                agent_log_path.unlink(missing_ok=True)
                 pipeline.log_path = str(agent_log_path)
             task = suite.get_user_task_by_id(task_id)
             try:

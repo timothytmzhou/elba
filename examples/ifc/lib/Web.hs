@@ -37,6 +37,8 @@ mkWeb br = do
   let bridge = br
   pure Web {..}
 
+-- | Returns the content of the webpage at a given URL.
+-- @url@: The URL of the webpage.
 getWebpage :: Web -> Url -> DC String
 getWebpage w u =
   ioTCB $
@@ -45,6 +47,9 @@ getWebpage w u =
       "get_webpage"
       (object ["url" .= u])
 
+-- | Posts a webpage at a given URL with the given content.
+-- @url@: The URL of the webpage.
+-- @content@: The content of the webpage.
 postWebpage :: Web -> Url -> String -> DC ()
 postWebpage w u content =
   ioTCB $

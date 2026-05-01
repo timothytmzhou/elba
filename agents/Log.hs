@@ -20,7 +20,7 @@ import Data.Time.Format.ISO8601 (iso8601Show)
 import System.IO
   ( BufferMode (LineBuffering)
   , Handle
-  , IOMode (WriteMode)
+  , IOMode (AppendMode)
   , hClose
   , hSetBuffering
   , openFile
@@ -58,7 +58,7 @@ instance ToJSON Event where
 withLog :: Maybe FilePath -> (Log -> IO a) -> IO a
 withLog Nothing action = action (Log Nothing)
 withLog (Just path) action = do
-  h <- openFile path WriteMode
+  h <- openFile path AppendMode
   hSetBuffering h LineBuffering
   result <- action (Log (Just h))
   hClose h

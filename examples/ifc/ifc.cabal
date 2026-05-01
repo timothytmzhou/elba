@@ -13,6 +13,7 @@ library
 
   hs-source-dirs:   lib
   default-language: GHC2024
+  ghc-options:      -haddock
   build-depends:
     aeson,
     base >= 4.20 && < 5,

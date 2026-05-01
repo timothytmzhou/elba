@@ -97,9 +97,13 @@ channelName = BS.unpack . principalName
 -- Tool functions: each is a thin wrapper that lifts the bridge call into DC.
 -- Label checks (taint, guardAlloc) are deliberately absent in the baseline.
 
+-- | Get the list of channels in the slack.
 getChannels :: Slack -> DC [Channel]
 getChannels s = ioTCB $ callPy (bridge s) "get_channels" A.Null
 
+-- | Add a user to a given channel.
+-- @user@: The user to add to the channel.
+-- @channel@: The channel to add the user to.
 addUserToChannel :: Slack -> User -> Channel -> DC ()
 addUserToChannel s u c =
   ioTCB $
@@ -108,6 +112,8 @@ addUserToChannel s u c =
       "add_user_to_channel"
       (object ["user" .= u, "channel" .= c])
 
+-- | Read the messages from the given channel.
+-- @channel@: The channel to read the messages from.
 readChannelMessages :: Slack -> Channel -> DC [Message]
 readChannelMessages s c =
   ioTCB $
@@ -116,6 +122,8 @@ readChannelMessages s c =
       "read_channel_messages"
       (object ["channel" .= c])
 
+-- | Read the messages from the given user inbox.
+-- @user@: The user whose inbox to read.
 readInbox :: Slack -> User -> DC [Message]
 readInbox s u =
   ioTCB $
@@ -124,6 +132,9 @@ readInbox s u =
       "read_inbox"
       (object ["user" .= u])
 
+-- | Send a direct message from the bot to @recipient@ with the given @body@.
+-- @recipient@: The recipient of the message.
+-- @body@: The body of the message.
 sendDirectMessage :: Slack -> User -> Body -> DC ()
 sendDirectMessage s recipient body =
   ioTCB $
@@ -132,6 +143,9 @@ sendDirectMessage s recipient body =
       "send_direct_message"
       (object ["recipient" .= recipient, "body" .= body])
 
+-- | Send a channel message from the bot to @channel@ with the given @body@.
+-- @channel@: The channel to send the message to.
+-- @body@: The body of the message.
 sendChannelMessage :: Slack -> Channel -> Body -> DC ()
 sendChannelMessage s c body =
   ioTCB $
@@ -140,6 +154,9 @@ sendChannelMessage s c body =
       "send_channel_message"
       (object ["channel" .= c, "body" .= body])
 
+-- | Invites a user to the Slack workspace.
+-- @user@: The user to invite.
+-- @user_email@: The user email where invite should be sent.
 inviteUserToSlack :: Slack -> User -> String -> DC ()
 inviteUserToSlack s u email =
   ioTCB $
@@ -148,6 +165,8 @@ inviteUserToSlack s u email =
       "invite_user_to_slack"
       (object ["user" .= u, "user_email" .= email])
 
+-- | Remove a user from the Slack workspace.
+-- @user@: The user to remove.
 removeUserFromSlack :: Slack -> User -> DC ()
 removeUserFromSlack s u =
   ioTCB $
@@ -156,6 +175,8 @@ removeUserFromSlack s u =
       "remove_user_from_slack"
       (object ["user" .= u])
 
+-- | Get the list of users in the given channel.
+-- @channel@: The channel to get the users from.
 getUsersInChannel :: Slack -> Channel -> DC [User]
 getUsersInChannel s c =
   ioTCB $

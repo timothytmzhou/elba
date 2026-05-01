@@ -23,28 +23,45 @@ import Language.Haskell.TH.Syntax (Extension (..), NameSpace (DataName, VarName)
 data Env = Env
   { names :: [Name],
     modules :: [ModuleName],
-    extensions :: [Extension]
+    silentModules :: [ModuleName],
+    extensions :: [Extension],
+    toolDocs :: Map String String
   }
 
 defEnv :: Env
-defEnv = Env {names = [], modules = [], extensions = []}
+defEnv = Env {names = [], modules = [], silentModules = [], extensions = [], toolDocs = Map.empty}
 
-newtype TypeEnv = TypeEnv (Map String String)
+-- TypeEnv: name -> (signature, optional docstring). Show formats each entry
+-- as `name :: signature`, optionally followed by an indented doc.
+newtype TypeEnv = TypeEnv (Map String (String, Maybe String))
 
 instance Show TypeEnv where
-  show (TypeEnv m) = unlines [name ++ " :: " ++ ty | (name, ty) <- Map.toList m]
+  show (TypeEnv m) =
+    unlines
+      [ entry name sig mDoc
+      | (name, (sig, mDoc)) <- Map.toList m
+      ]
+    where
+      entry name sig Nothing = name ++ " :: " ++ sig
+      entry name sig (Just doc) =
+        name
+          ++ " :: "
+          ++ sig
+          ++ "\n"
+          ++ unlines ["    " ++ ln | ln <- lines doc]
 
 setEnv :: Env -> [ModuleName] -> Interpreter TypeEnv
-setEnv Env {names, modules} silentModules = do
+setEnv Env {names, modules, silentModules = userSilent, toolDocs} silentModules = do
   let namedImports = importNames names
-  let moduleImports = importModules (modules ++ silentModules)
+  let moduleImports = importModules (modules ++ silentModules ++ userSilent)
   setImportsF (namedImports ++ moduleImports)
 
   let namedValues = listNamedValues names
   moduleValues <- listModuleValues modules
 
   sigs <- typeSigs (namedValues ++ moduleValues)
-  pure (TypeEnv (Map.fromList sigs))
+  let entries = [(n, (s, Map.lookup n toolDocs)) | (n, s) <- sigs]
+  pure (TypeEnv (Map.fromList entries))
 
 importNames :: [Name] -> [ModuleImport]
 importNames names =

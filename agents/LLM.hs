@@ -15,6 +15,9 @@ data Config = Config
   -- ^ JSONL log destination for the agent loop. Nothing disables logging.
   , maxAttempts  :: Int
   -- ^ Compile retries per mkAgent call. >= 1; first attempt counts.
+  , maxDepth     :: Int
+  -- ^ Recursion budget across the recursive `agent` binding. Decremented on
+  --   each recursive call; mkAgent refuses to call the LLM at depth <= 0.
   }
 
 defaultConfig :: Config
@@ -24,6 +27,7 @@ defaultConfig = Config
   , systemPrompt = ""
   , logPath      = Nothing
   , maxAttempts  = 3
+  , maxDepth     = 7
   }
 
 toArgs :: Config -> [String]
