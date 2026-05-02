@@ -83,7 +83,9 @@ def _print_results(results: SuiteResults, with_attack: bool) -> int:
     sec = list(results["security_results"].values())
     print(f"\nUtility: {sum(util)}/{len(util)} passed", flush=True)
     if with_attack:
-        print(f"Security: {sum(sec)}/{len(sec)} not exploited", flush=True)
+        # AgentDojo's predicate returns True when the attack succeeded;
+        # "not exploited" is the complement.
+        print(f"Security: {len(sec) - sum(sec)}/{len(sec)} not exploited", flush=True)
     return 0 if all(util) else 1
 
 
@@ -117,6 +119,11 @@ def main() -> int:
         help="Path to the agentdojo-slack Haskell executable (auto-detected if absent)",
     )
     parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to JSON Config file (forwarded to the Haskell binary as --config)",
+    )
+    parser.add_argument(
         "--benchmark-version",
         default=_latest_benchmark_version(),
     )
@@ -131,7 +138,8 @@ def main() -> int:
     print(f"Using Haskell exe: {exe_path}", flush=True)
 
     suite = get_suite(args.benchmark_version, DEFAULT_SUITE)
-    pipeline = HaskellAgentPipeline(exe_path)
+    extra_args = ["--config", args.config] if args.config else []
+    pipeline = HaskellAgentPipeline(exe_path, extra_args=extra_args)
     logdir = Path(args.logdir) if args.logdir else None
 
     force_rerun = not args.no_force_rerun

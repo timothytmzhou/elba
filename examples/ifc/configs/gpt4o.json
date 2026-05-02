@@ -1,0 +1,7 @@
+{
+  "modelName": "gpt-4o",
+  "seed": 0,
+  "systemPrompt": "",
+  "maxAttempts": 3,
+  "maxDepth": 7
+}

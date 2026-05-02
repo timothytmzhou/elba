@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
-from agentdojo.functions_runtime import EmptyEnv, Env, FunctionsRuntime
+from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
 from agentdojo.types import ChatAssistantMessage, ChatMessage, TextContentBlock
 
 
@@ -43,8 +43,9 @@ def _to_jsonable(obj: Any) -> Any:
 class HaskellAgentPipeline(BasePipelineElement):
     name = "haskell-agent"
 
-    def __init__(self, exe_path: str) -> None:
+    def __init__(self, exe_path: str, extra_args: list[str] | None = None) -> None:
         self.exe_path = exe_path
+        self.extra_args = list(extra_args) if extra_args else []
         # Mutated by the driver (run_eval.py) before each task to point the
         # Haskell-side JSONL log at a per-task path; left as None to disable.
         self.log_path: str | None = None
@@ -57,7 +58,7 @@ class HaskellAgentPipeline(BasePipelineElement):
         messages: Sequence[ChatMessage] = [],
         extra_args: dict = {},
     ) -> tuple[str, FunctionsRuntime, Env, Sequence[ChatMessage], dict]:
-        cmd = [self.exe_path]
+        cmd = [self.exe_path, *self.extra_args]
         if self.log_path is not None:
             cmd += ["--log-path", self.log_path]
         # stderr is inherited so Haskell-side traces (the agents/Agents.hs debug
@@ -74,7 +75,7 @@ class HaskellAgentPipeline(BasePipelineElement):
 
         try:
             self._send(proc, {"prompt": query})
-            answer, succeeded = self._loop(proc, runtime, env)
+            answer, succeeded, tool_calls = self._loop(proc, runtime, env)
         except Exception:
             proc.kill()
             raise
@@ -84,7 +85,7 @@ class HaskellAgentPipeline(BasePipelineElement):
 
         content_blocks = [TextContentBlock(type="text", content=answer)]
         new_messages = list(messages) + [
-            ChatAssistantMessage(role="assistant", content=content_blocks, tool_calls=None)
+            ChatAssistantMessage(role="assistant", content=content_blocks, tool_calls=tool_calls)
         ]
         return answer, runtime, env, new_messages, extra_args
 
@@ -98,8 +99,9 @@ class HaskellAgentPipeline(BasePipelineElement):
         proc: subprocess.Popen[str],
         runtime: FunctionsRuntime,
         env: Env,
-    ) -> tuple[str, bool]:
+    ) -> tuple[str, bool, list[FunctionCall]]:
         assert proc.stdout is not None
+        tool_calls: list[FunctionCall] = []
         while True:
             line = proc.stdout.readline()
             if not line:
@@ -113,15 +115,16 @@ class HaskellAgentPipeline(BasePipelineElement):
                 args = msg.get("args") or {}
                 if not isinstance(args, dict):
                     args = {}
+                tool_calls.append(FunctionCall(function=method, args=args))
                 result, error = runtime.run_function(env, method, args)
                 if error is None:
                     self._send(proc, {"ok": _to_jsonable(result)})
                 else:
                     self._send(proc, {"err": error})
             elif "done" in msg:
-                return msg["done"], True
+                return msg["done"], True, tool_calls
             elif "failed" in msg:
                 print(f"[haskell-agent failed] {msg['failed']}", file=sys.stderr, flush=True)
-                return msg["failed"], False
+                return msg["failed"], False, tool_calls
             else:
                 raise RuntimeError(f"Unknown message from Haskell child: {msg!r}")

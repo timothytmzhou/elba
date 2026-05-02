@@ -1,9 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
+-- The "bridge" is just the process's standard handles. There's no
+-- handle value to thread through; tools are plain `IO` functions
+-- that read/write stdin/stdout. This works across the hint
+-- interpreter session because `stdin` and `stdout` ultimately
+-- reference fd 0/1, which are shared at the OS level (unlike
+-- user-defined module-level CAFs, which hint allocates separately).
+
 module Bridge
-  ( Bridge
-  , withBridge
+  ( withBridge
   , readPrompt
   , sendDone
   , sendFailed
@@ -26,39 +32,40 @@ import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString.Char8 qualified as BS
 import Data.ByteString.Lazy qualified as BSL
 import Data.Text qualified as T
-import System.IO (BufferMode (LineBuffering), Handle, hFlush, hSetBuffering, stdin, stdout)
-
-data Bridge = Bridge {bIn :: Handle, bOut :: Handle}
+import System.IO (BufferMode (LineBuffering), hFlush, hSetBuffering, stdin, stdout)
 
 newtype ToolError = ToolError String
   deriving (Show)
 
 instance Exception ToolError
 
-withBridge :: (Bridge -> IO a) -> IO a
+-- | Configure stdin/stdout for line-by-line JSON-RPC, then run the
+-- action. Replaces the old `withBridge :: (Bridge -> IO a) -> IO a`
+-- — there's no handle value any more.
+withBridge :: IO a -> IO a
 withBridge action = do
   hSetBuffering stdin LineBuffering
   hSetBuffering stdout LineBuffering
-  action (Bridge stdin stdout)
+  action
 
-readPrompt :: Bridge -> IO String
-readPrompt br = do
-  line <- BS.hGetLine (bIn br)
-  let parsed = decodeStrict line :: Maybe Value
-  case parsed of
-    Just (Object o) | Just (String t) <- KM.lookup "prompt" o -> pure (T.unpack t)
+readPrompt :: IO String
+readPrompt = do
+  line <- BS.hGetLine stdin
+  case decodeStrict line :: Maybe Value of
+    Just (Object o)
+      | Just (String t) <- KM.lookup "prompt" o -> pure (T.unpack t)
     _ -> error ("Bridge.readPrompt: expected {\"prompt\": ...}, got: " ++ BS.unpack line)
 
-sendDone :: Bridge -> String -> IO ()
-sendDone br answer = sendLine br (object ["done" .= answer])
+sendDone :: String -> IO ()
+sendDone answer = sendLine (object ["done" .= answer])
 
-sendFailed :: Bridge -> String -> IO ()
-sendFailed br msg = sendLine br (object ["failed" .= msg])
+sendFailed :: String -> IO ()
+sendFailed msg = sendLine (object ["failed" .= msg])
 
-callPy :: (FromJSON b) => Bridge -> String -> Value -> IO b
-callPy br method args = do
-  sendLine br (object ["call" .= method, "args" .= args])
-  reply <- BS.hGetLine (bIn br)
+callPy :: (FromJSON b) => String -> Value -> IO b
+callPy method args = do
+  sendLine (object ["call" .= method, "args" .= args])
+  reply <- BS.hGetLine stdin
   case decodeStrict reply :: Maybe Value of
     Just (Object o)
       | Just v <- KM.lookup "ok" o ->
@@ -69,7 +76,7 @@ callPy br method args = do
           throwIO (ToolError (T.unpack e))
     _ -> error ("Bridge.callPy: malformed reply: " ++ BS.unpack reply)
 
-sendLine :: Bridge -> Value -> IO ()
-sendLine br v = do
-  BSL.hPut (bOut br) (encode v <> "\n")
-  hFlush (bOut br)
+sendLine :: Value -> IO ()
+sendLine v = do
+  BSL.hPut stdout (encode v <> "\n")
+  hFlush stdout

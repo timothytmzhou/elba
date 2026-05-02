@@ -1,10 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
 import Agents (mkAgent)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
+import Data.Aeson (eitherDecode)
+import Data.Aeson.TH (defaultOptions, deriveFromJSON)
+import qualified Data.ByteString.Lazy as BL
 import Env (Env (..), defEnv)
 import LLM (Config (..), defaultConfig)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
@@ -12,6 +16,8 @@ import Slack
 import System.Environment (getArgs)
 import TH (addTools)
 import Web
+
+$(deriveFromJSON defaultOptions ''Config)
 
 agentEnv :: Env
 agentEnv =
@@ -43,16 +49,27 @@ parseLogPath ("--log-path" : p : _) = Just p
 parseLogPath (_ : rest) = parseLogPath rest
 parseLogPath [] = Nothing
 
+parseConfigPath :: [String] -> Maybe FilePath
+parseConfigPath ("--config" : p : _) = Just p
+parseConfigPath (_ : rest) = parseConfigPath rest
+parseConfigPath [] = Nothing
+
+loadConfig :: FilePath -> IO Config
+loadConfig path = do
+  bs <- BL.readFile path
+  case eitherDecode bs of
+    Right cfg -> pure cfg
+    Left err -> error ("config decode failed: " ++ err)
+
 main :: IO ()
 main = do
-  agentLogPath <- parseLogPath <$> getArgs
-  withBridge $ \br -> do
-    prompt <- readPrompt br
-    let cfg = defaultConfig {logPath = agentLogPath}
-    let agentExpr = mkAgent cfg agentEnv prompt :: Slack -> Web -> IO String
-    let slack = mkSlack br
-    let web = mkWeb br
-    result <- try (agentExpr slack web) :: IO (Either SomeException String)
+  args <- getArgs
+  baseCfg <- maybe (pure defaultConfig) loadConfig (parseConfigPath args)
+  let cfg = baseCfg {logPath = parseLogPath args}
+  withBridge $ do
+    prompt <- readPrompt
+    let agentExpr = mkAgent cfg agentEnv prompt :: IO String
+    result <- try agentExpr :: IO (Either SomeException String)
     case result of
-      Right answer -> sendDone br answer
-      Left (e :: SomeException) -> sendFailed br (displayException e)
+      Right answer -> sendDone answer
+      Left (e :: SomeException) -> sendFailed (displayException e)
