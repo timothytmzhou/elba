@@ -1,59 +1,38 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
 
--- Web tool bindings for AgentDojo's slack default suite.
--- Same shape as Slack: pageLabels mirrors the Python Web class' page state,
--- holding labels (not data). Baseline tool functions do not consult labels.
+-- Insecure baseline for AgentDojo's Web tools. Bridge handle is
+-- threaded through the `Web` value because of hint's CAF isolation
+-- (see comment on Slack.hs).
 
 module Web
   ( Url
   , Web
   , mkWeb
+  , bridge
   , getWebpage
   , postWebpage
   ) where
 
 import Bridge (Bridge, callPy)
 import Data.Aeson (object, (.=))
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
-import LIO (LIO)
-import LIO.DCLabel (DCLabel, dcPublic)
-import LIO.LIORef (LIORef, newLIORef)
-import LIO.TCB (ioTCB)
-import Slack (DC)
 
 type Url = String
 
-data Web = Web
-  { pageLabels :: LIORef DCLabel (Map Url DCLabel)
-  , bridge :: Bridge
-  }
+newtype Web = Web {bridge :: Bridge}
 
-mkWeb :: Bridge -> DC Web
-mkWeb br = do
-  pageLabels <- newLIORef dcPublic Map.empty
-  let bridge = br
-  pure Web {..}
+mkWeb :: Bridge -> Web
+mkWeb = Web
 
 -- | Returns the content of the webpage at a given URL.
 -- @url@: The URL of the webpage.
-getWebpage :: Web -> Url -> DC String
+getWebpage :: Web -> Url -> IO String
 getWebpage w u =
-  ioTCB $
-    callPy
-      (bridge w)
-      "get_webpage"
-      (object ["url" .= u])
+  callPy (bridge w) "get_webpage" (object ["url" .= u])
 
 -- | Posts a webpage at a given URL with the given content.
 -- @url@: The URL of the webpage.
 -- @content@: The content of the webpage.
-postWebpage :: Web -> Url -> String -> DC ()
+postWebpage :: Web -> Url -> String -> IO ()
 postWebpage w u content =
-  ioTCB $
-    callPy
-      (bridge w)
-      "post_webpage"
-      (object ["url" .= u, "content" .= content])
+  callPy (bridge w) "post_webpage" (object ["url" .= u, "content" .= content])

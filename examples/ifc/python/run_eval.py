@@ -1,11 +1,19 @@
 """CLI for running the Haskell-backed agent against AgentDojo's slack suite.
 
-Usage:
-    # Sweep the whole suite (default) and print per-task + aggregate results:
-    python run_eval.py
+Mirrors `agentdojo/scripts/benchmark.py`: dispatches to AgentDojo's own
+`benchmark_suite_*injections` functions so we stay close to parity with the
+canonical eval. Use `--attack <name>` to run prompt-injection attacks; omit
+it for the no-injection baseline.
 
-    # Run one task:
-    python run_eval.py --user-task user_task_0
+Usage:
+    # No-injection baseline over the whole suite:
+    python run_eval.py --logdir logs/
+
+    # Run one task, no attack:
+    python run_eval.py --user-task user_task_0 --logdir logs/
+
+    # Full sweep with the AgentDojo paper's primary attack:
+    python run_eval.py --attack important_instructions --logdir logs/
 
     # Override the binary (defaults to `cabal list-bin agentdojo-slack`):
     python run_eval.py --exe /path/to/agentdojo-slack
@@ -21,10 +29,22 @@ from pathlib import Path
 
 from packaging.version import Version
 
-from agentdojo.benchmark import TaskResults, run_task_without_injection_tasks
+from agentdojo.attacks.attack_registry import load_attack
+from agentdojo.benchmark import (
+    SuiteResults,
+    TaskResults,
+    benchmark_suite_with_injections,
+    benchmark_suite_without_injections,
+)
 from agentdojo.functions_runtime import FunctionCall  # noqa: F401  needed for the rebuild below
 from agentdojo.logging import OutputLogger
+from agentdojo.models import MODEL_NAMES
 from agentdojo.task_suite.load_suites import _SUITES, get_suite
+
+# `important_instructions`-family attacks substring-match pipeline.name
+# against MODEL_NAMES to pick a model identifier to embed in the
+# injection text. Our pipeline.name is "haskell-agent", so register it.
+MODEL_NAMES.setdefault("haskell-agent", "AI assistant")
 
 # AgentDojo declares TaskResults with a forward reference to FunctionCall; the
 # pydantic model isn't finalized until both are imported and rebuild() is called.
@@ -53,12 +73,43 @@ def _default_exe_path() -> str:
     return out.strip().splitlines()[-1]
 
 
+def _print_results(results: SuiteResults, with_attack: bool) -> int:
+    for (uid, iid), util in sorted(results["utility_results"].items()):
+        sec = results["security_results"][(uid, iid)]
+        label = f"{uid} / {iid}" if iid else uid
+        print(f"  {label}: utility={util}  security={sec}", flush=True)
+
+    util = list(results["utility_results"].values())
+    sec = list(results["security_results"].values())
+    print(f"\nUtility: {sum(util)}/{len(util)} passed", flush=True)
+    if with_attack:
+        print(f"Security: {sum(sec)}/{len(sec)} not exploited", flush=True)
+    return 0 if all(util) else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--user-task",
+        action="append",
+        default=[],
+        help="Filter user tasks (repeatable, e.g. --user-task user_task_0). Defaults to all.",
+    )
+    parser.add_argument(
+        "--attack",
         default=None,
-        help="Run a single user task (e.g. user_task_0). If omitted, sweeps every user task in the suite.",
+        help="Attack name (e.g. important_instructions). Omit for the no-injection baseline.",
+    )
+    parser.add_argument(
+        "--injection-task",
+        action="append",
+        default=[],
+        help="Filter injection tasks (repeatable). Only meaningful with --attack.",
+    )
+    parser.add_argument(
+        "--no-force-rerun",
+        action="store_true",
+        help="Reuse cached per-task results in <logdir> instead of re-running.",
     )
     parser.add_argument(
         "--exe",
@@ -83,46 +134,49 @@ def main() -> int:
     pipeline = HaskellAgentPipeline(exe_path)
     logdir = Path(args.logdir) if args.logdir else None
 
-    if args.user_task is not None:
-        task_ids = [args.user_task]
+    force_rerun = not args.no_force_rerun
+
+    if logdir is not None:
+        agent_log_dir = logdir / pipeline.name
+        agent_log_dir.mkdir(parents=True, exist_ok=True)
+        pipeline.log_path = str(agent_log_dir / "agent.log")
+        if force_rerun:
+            # Resume runs (--no-force-rerun) keep the existing log so the
+            # accumulated transcript across resumed sessions stays available.
+            Path(pipeline.log_path).unlink(missing_ok=True)
+
+    user_tasks = args.user_task or None
+    injection_tasks = args.injection_task or None
+
+    if args.attack is None:
+        print(f"Running suite '{DEFAULT_SUITE}' (no attack)\n", flush=True)
     else:
-        task_ids = sorted(suite.user_tasks.keys())
+        print(f"Running suite '{DEFAULT_SUITE}' with attack '{args.attack}'\n", flush=True)
 
-    print(f"Running {len(task_ids)} task(s) on suite '{DEFAULT_SUITE}'...\n", flush=True)
+    with OutputLogger(str(logdir) if logdir else None):
+        if args.attack is None:
+            results = benchmark_suite_without_injections(
+                pipeline,
+                suite,
+                user_tasks=user_tasks,
+                logdir=logdir,
+                force_rerun=force_rerun,
+                benchmark_version=args.benchmark_version,
+            )
+        else:
+            attacker = load_attack(args.attack, suite, pipeline)
+            results = benchmark_suite_with_injections(
+                pipeline,
+                suite,
+                attacker,
+                user_tasks=user_tasks,
+                injection_tasks=injection_tasks,
+                logdir=logdir,
+                force_rerun=force_rerun,
+                benchmark_version=args.benchmark_version,
+            )
 
-    results: list[tuple[str, bool, bool]] = []
-    with OutputLogger(logdir=str(logdir) if logdir else None):
-        for task_id in task_ids:
-            # Place the Haskell-side agent log next to AgentDojo's none.json
-            # for the same task: <logdir>/haskell-agent/<suite>/<task>/none/agent.log
-            if logdir:
-                agent_log_path = (
-                    logdir / pipeline.name / DEFAULT_SUITE / task_id / "none" / "agent.log"
-                )
-                agent_log_path.parent.mkdir(parents=True, exist_ok=True)
-                agent_log_path.unlink(missing_ok=True)
-                pipeline.log_path = str(agent_log_path)
-            task = suite.get_user_task_by_id(task_id)
-            try:
-                utility, security = run_task_without_injection_tasks(
-                    suite=suite,
-                    agent_pipeline=pipeline,
-                    task=task,
-                    logdir=logdir,
-                    force_rerun=True,
-                    benchmark_version=args.benchmark_version,
-                )
-            except Exception as e:
-                print(f"  {task_id}: CRASHED ({type(e).__name__}: {e})", flush=True)
-                results.append((task_id, False, False))
-                continue
-            print(f"  {task_id}: utility={utility}  security={security}", flush=True)
-            results.append((task_id, utility, security))
-
-    passed = sum(1 for _, u, _ in results if u)
-    total = len(results)
-    print(f"\nUtility: {passed}/{total} passed", flush=True)
-    return 0 if passed == total else 1
+    return _print_results(results, with_attack=args.attack is not None)
 
 
 if __name__ == "__main__":

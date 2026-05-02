@@ -1,7 +1,7 @@
 cabal-version: 3.0
 name:          ifc
 version:       0.1.0.0
-synopsis:      LIO-based bindings for AgentDojo's slack default suite
+synopsis:      Bindings for AgentDojo's slack default suite
 license:       MIT
 build-type:    Simple
 
@@ -19,7 +19,6 @@ library
     base >= 4.20 && < 5,
     bytestring,
     containers,
-    lio,
     text
 
 executable agentdojo-slack
@@ -30,5 +29,4 @@ executable agentdojo-slack
     agents,
     base >= 4.20 && < 5,
     ifc,
-    lio,
     template-haskell
