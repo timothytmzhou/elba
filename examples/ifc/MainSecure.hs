@@ -6,56 +6,44 @@ import Agents (mkAgent)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
-import LIO (LIOState (..), evalLIO)
-import LIO.DCLabel (DCLabel, cFalse, cTrue, dcPublic, (%%))
+import LIO (LIOState (..), evalLIO, label, unlabel)
+import LIO.Concurrent (lFork, lWait)
+import LIO.DCLabel (DC, DCLabel, cFalse, cTrue, dcPublic, (%%), (/\), (\/))
 import LLM (Config (..), defaultConfig)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
-import SlackSecure
+import Slack
 import System.Environment (getArgs)
 import TH (addTools)
-import WebSecure
+import Web
 
 agentEnv :: Env
 agentEnv =
   $( addTools
-       [ -- Slack tools
-         'getChannels
-       , 'addUserToChannel
-       , 'readChannelMessages
-       , 'readInbox
-       , 'sendDirectMessage
-       , 'sendChannelMessage
-       , 'inviteUserToSlack
-       , 'removeUserFromSlack
-       , 'getUsersInChannel
-       , 'Message
-       , 'sender
-       , 'recipient
-       , 'body
-         -- Web tools
-       , 'getWebpage
-       , 'postWebpage
-         -- LIO API
-       , 'label
+       [ -- LIO API (curated subset; LIO itself stays silent)
+         'label
        , 'unlabel
        , 'lFork
        , 'lWait
        , 'dcPublic
+       , '(%%)
+       , '(/\)
+       , '(\/)
        ]
    )
     defEnv
-      { silentModules = ["SlackSecure", "WebSecure", "LIO"]
+      { modules = ["Slack", "Web"]
+      , silentModules = ["LIO"]
       , extensions = [OverloadedStrings]
       }
 
--- Clearance is set to the top of the DCLabel lattice (`cFalse %% cTrue`)
--- so the read-tier wrappers can allocate `Labeled DCLabel x` at the
--- "external" secrecy label. The agent's policy is enforced by the
--- per-tool priv gating, not by clearance.
+-- Initial label is `dcBottom = True %% False`: secrecy at the bottom
+-- of the secrecy lattice and integrity at the bottom of the integrity
+-- lattice, so both components grow monotonically as the agent reads.
+-- Clearance is the top of the DCLabel lattice.
 initialState :: LIOState DCLabel
 initialState =
   LIOState
-    { lioLabel = dcPublic
+    { lioLabel = dcBottom
     , lioClearance = cFalse %% cTrue
     }
 
@@ -64,24 +52,14 @@ parseLogPath ("--log-path" : p : _) = Just p
 parseLogPath (_ : rest) = parseLogPath rest
 parseLogPath [] = Nothing
 
--- The principal whose authority the agent acts under. Matches AgentDojo's
--- default user "Emma Johnson" so the agent's user-priv covers Emma.
-agentPrincipalName :: String
-agentPrincipalName = "Emma Johnson"
-
 main :: IO ()
 main = do
   agentLogPath <- parseLogPath <$> getArgs
-  let userPriv = mintUserPriv agentPrincipalName
-  withBridge $ \br -> do
-    prompt <- readPrompt br
+  withBridge $ do
+    prompt <- readPrompt
     let cfg = defaultConfig {logPath = agentLogPath}
-    let agentExpr = mkAgent cfg agentEnv prompt :: Slack -> Web -> DC String
-    let task = do
-          let slack = mkSlack br userPriv
-          let web = mkWeb br userPriv
-          agentExpr slack web
-    result <- try (evalLIO task initialState) :: IO (Either SomeException String)
+    let agentExpr = mkAgent cfg agentEnv prompt :: DC String
+    result <- try (evalLIO agentExpr initialState) :: IO (Either SomeException String)
     case result of
-      Right answer -> sendDone br answer
-      Left (e :: SomeException) -> sendFailed br (displayException e)
+      Right answer -> sendDone answer
+      Left (e :: SomeException) -> sendFailed (displayException e)

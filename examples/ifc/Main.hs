@@ -12,37 +12,18 @@ import qualified Data.ByteString.Lazy as BL
 import Env (Env (..), defEnv)
 import LLM (Config (..), defaultConfig)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
-import Slack
+import SlackTCB ()
 import System.Environment (getArgs)
-import TH (addTools)
-import Web
+import WebTCB ()
 
 $(deriveFromJSON defaultOptions ''Config)
 
 agentEnv :: Env
 agentEnv =
-  $( addTools
-       [ 'getChannels
-       , 'addUserToChannel
-       , 'readChannelMessages
-       , 'readInbox
-       , 'sendDirectMessage
-       , 'sendChannelMessage
-       , 'inviteUserToSlack
-       , 'removeUserFromSlack
-       , 'getUsersInChannel
-       , 'Message
-       , 'sender
-       , 'recipient
-       , 'body
-       , 'getWebpage
-       , 'postWebpage
-       ]
-   )
-    defEnv
-      { silentModules = ["Slack", "Web"]
-      , extensions = [OverloadedStrings]
-      }
+  defEnv
+    { modules = ["SlackTCB", "WebTCB"]
+    , extensions = [OverloadedStrings]
+    }
 
 parseLogPath :: [String] -> Maybe FilePath
 parseLogPath ("--log-path" : p : _) = Just p

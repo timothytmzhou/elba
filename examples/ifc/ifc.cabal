@@ -9,7 +9,9 @@ library
   exposed-modules:
     Bridge
     Slack
+    SlackTCB
     Web
+    WebTCB
 
   hs-source-dirs:   lib
   default-language: GHC2024
@@ -19,6 +21,7 @@ library
     base >= 4.20 && < 5,
     bytestring,
     containers,
+    lio,
     text
 
 executable agentdojo-slack
@@ -31,4 +34,27 @@ executable agentdojo-slack
     base >= 4.20 && < 5,
     bytestring,
     ifc,
+    template-haskell
+
+executable agentdojo-slack-secure
+  main-is:          MainSecure.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    agents,
+    base >= 4.20 && < 5,
+    ifc,
+    lio,
+    template-haskell
+
+executable env-test
+  main-is:          EnvTest.hs
+  hs-source-dirs:   .
+  default-language: GHC2024
+  build-depends:
+    agents,
+    base >= 4.20 && < 5,
+    hint,
+    ifc,
+    lio,
     template-haskell

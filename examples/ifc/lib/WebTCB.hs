@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- Insecure baseline for AgentDojo's Web tools. Tools call
--- `Bridge.callPy` directly; no `Web` handle to thread.
+-- Trusted-base IO interface to AgentDojo's Web tools. Tools call
+-- `Bridge.callPy` directly and return plain `IO`. The LIO-secured
+-- wrapper that the agent actually sees lives in `Web`.
 
-module Web
+module WebTCB
   ( Url
   , getWebpage
   , postWebpage

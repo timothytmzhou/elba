@@ -2,13 +2,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
 
--- Insecure baseline for AgentDojo's slack default suite. Tools have
--- no `Slack` argument; they read/write stdin/stdout directly via
--- `Bridge.callPy`. The agent's main type is just `IO String` and
--- sub-agents typed `IO X` get tool access for free (no `Slack ->`
--- prefix to thread).
+-- Trusted-base IO interface to AgentDojo's slack default suite.
+-- Tools call `Bridge.callPy` directly and return plain `IO`. The
+-- LIO-secured wrapper that the agent actually sees lives in `Slack`.
 
-module Slack
+module SlackTCB
   ( Body
   , Message (..)
   , getChannels
