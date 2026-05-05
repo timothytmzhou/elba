@@ -51,6 +51,19 @@ retryMessage errStr =
     , "Re-emit a corrected Haskell expression of the required type."
     ]
 
+-- | Strip a markdown code fence around the LLM's emission. If the response
+-- contains lines whose first non-space chars are "```", return the content
+-- between the first and second such lines. Otherwise return the input
+-- unchanged. Handles ```haskell ... ```, bare ``` ... ```, and prose
+-- surrounding the fenced block.
+stripFence :: String -> String
+stripFence s
+  | not (any isFence ls) = s
+  | otherwise = unlines (takeWhile (not . isFence) (drop 1 (dropWhile (not . isFence) ls)))
+  where
+    ls = lines s
+    isFence l = take 3 (dropWhile (== ' ') l) == "```"
+
 formatErr :: InterpreterError -> String
 formatErr (WontCompile ghcErrors) = unlines (map errMsg ghcErrors)
 formatErr e = show e
@@ -70,7 +83,7 @@ mkAgent config env userPrompt = unsafePerformIO $
       setupInterp env
       typeEnv <- setEnv env baseModules
       let ctx = buildContext (Proxy :: Proxy a) typeEnv userPrompt
-      code <- liftIO (ask ctx)
+      code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request Agents.systemPrompt ctx requiredType))
       liftIO (logEvent lg (Response code))
       runAttempt lg ask code 0
@@ -94,7 +107,7 @@ mkAgent config env userPrompt = unsafePerformIO $
     handleFailure lg ask errStr attempt
       | attempt < LLM.maxAttempts config - 1 = do
           liftIO (logEvent lg (Retry errStr))
-          newCode <- liftIO (ask (retryMessage errStr))
+          newCode <- stripFence <$> liftIO (ask (retryMessage errStr))
           liftIO (logEvent lg (Response newCode))
           runAttempt lg ask newCode (attempt + 1)
       | otherwise = do

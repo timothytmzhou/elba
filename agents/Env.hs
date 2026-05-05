@@ -8,6 +8,7 @@ module Env
   )
 where
 
+import Data.Char (isAlpha)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust)
@@ -69,7 +70,7 @@ importNames names =
   | (m, bases) <- groupByFst (map splitName names)
   ]
   where
-    mkImport m bases = ModuleImport m NotQualified (ImportList bases)
+    mkImport m bases = ModuleImport m NotQualified (ImportList (map parenIfOp bases))
     splitName n = (fromJust (nameModule n), nameBase n)
     groupByFst = Map.toList . Map.fromListWith (++) . map (\(k, v) -> (k, [v]))
 
@@ -77,9 +78,15 @@ importModules :: [ModuleName] -> [ModuleImport]
 importModules ms = [ModuleImport m NotQualified NoImportList | m <- ms]
 
 listNamedValues :: [Name] -> [String]
-listNamedValues ns = [nameBase n | n <- ns, isValue n]
+listNamedValues ns = [parenIfOp (nameBase n) | n <- ns, isValue n]
   where
     isValue n = nameSpace n `elem` [Just VarName, Just DataName]
+
+-- Wrap operator names in parens so they're valid in import lists and
+-- in `typeOf` queries (e.g. `(%%)`, not `%%`).
+parenIfOp :: String -> String
+parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
+parenIfOp s = s
 
 listModuleValues :: [ModuleName] -> Interpreter [String]
 listModuleValues ms = do

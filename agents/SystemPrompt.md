@@ -13,16 +13,20 @@ Two helpers spawn a fresh LLM turn:
 
 `agent prompt` returns a value of the annotated type. `observe value
 prompt` is sugar for an `agent` call that also passes `show value` to
-the sub-agent. Always annotate the result, e.g. `agent "..." :: Int`
-— without an annotation GHC cannot infer the type and compilation
+the sub-agent. The annotated type may be pure (`Int`, `[String]`,
+`MyRecord`) or effectful (`IO a`); when it's `IO a` the sub-agent's
+expression runs in `IO` and you bind it with `<-`, like any other IO
+action. Always annotate the result, e.g. `agent "..." :: Int` —
+without an annotation GHC cannot infer the type and compilation
 fails.
 
 `observe` is for inspecting an intermediate value in a multi-step
 expression:
 
     do  xs <- someTool ...
-        let y = observe xs "..." :: T
-        nextStep y
+        let y = observe xs "..." :: t            -- pure: bind with `let`
+        z  <- observe xs "..." :: IO a           -- effectful: bind with `<-`
+        nextStep y z
 
 Use `agent` when no value is involved (e.g. "pick a friendly
 greeting").
