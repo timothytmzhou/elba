@@ -15,6 +15,9 @@ you cannot use the underlying value without acknowledging it.
 Your computation has a floating current label which will be raised by
 read operations.
 
+`unlabel :: DCLabeled a -> DC a` extracts the underlying value *and*
+raises your current label by that value's label.
+
 While your current label has not been tainted by data — i.e. its
 integrity component is still `cFalse` — every write tool (sends,
 posts, invites, adds, removes) is unconditional regardless of the
@@ -25,7 +28,10 @@ read anything that taints integrity.
 Once your current integrity has been tainted, send tools (direct
 messages, channel messages, web posts) additionally require the
 body's label to flow to the sink's label, and identity-mutating
-writes (invite/remove/add-user) are rejected outright.
+writes (invite/remove/add-user) are rejected outright. To convert a
+plain value (e.g. a literal body) into a `DCLabeled` labeled with the same current label, read your
+current label with `getLabel` and pass it to `label` — i.e.
+`do { l <- getLabel; b <- label l x; ... }`.
 
 ## Quarantining a tainted computation with `toLabeled`
 
@@ -39,7 +45,9 @@ writes.
 
 You should generally wrap any `subagent` call that reads or unlabels
 external data in `toLabeled` so the taint stays inside the labeled
-result.
+result. Prefer annotating subagents as `:: DC a` so they can call
+tools — their tool calls run in your DC scope under the same policy,
+so there's no security cost to giving them tool access.
 
 The wrap label `lbl` must sit at or above your current label both
 before the bracket runs and at the end of the inner action — i.e.

@@ -57,8 +57,8 @@ channelLabelTCB channel = do
   return (channelCnf %% channelCnf)
 
 -- | Get the list of channels in the slack.
--- Returns the list labeled at `True %% True`, and raises your
--- current label to `True %% True`.
+-- Returns the list labeled at `True %% True`. Does not raise your
+-- current label.
 getChannels :: DC (DCLabeled [String])
 getChannels = do
   channels <- ioTCB SlackTCB.getChannels

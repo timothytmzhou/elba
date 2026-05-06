@@ -6,7 +6,7 @@ module Web
   , postWebpage
   ) where
 
-import LIO (guardAlloc)
+import LIO (getLabel)
 import LIO.DCLabel (CNF, dcPublic, toCNF)
 import LIO.Labeled (labelOf, labelP, unlabelP)
 import LIO.TCB (Priv (PrivTCB), ioTCB)
@@ -19,13 +19,14 @@ omniPriv = PrivTCB (toCNF False)
 
 -- | Returns the content of the webpage at a given URL.
 -- @url@: The URL of the webpage.
--- Permitted only when your current secrecy is public. Returns the
--- content labeled at `dcPublic`. The call itself does not raise your
--- current label; subsequently `unlabel`ing the result raises it to
--- `dcPublic`.
+-- If your current label has not been tainted by data, the call is
+-- unconditional. Otherwise permitted only when your current secrecy
+-- is public. Returns the content labeled at `True %% True`. Does
+-- not raise your current label.
 getWebpage :: Url -> DC (DCLabeled String)
 getWebpage url = do
-  guardAlloc dcPublic
+  current <- getLabel
+  assertWrite current dcPublic
   content <- ioTCB (WebTCB.getWebpage url)
   labelP omniPriv dcPublic content
 
@@ -34,7 +35,7 @@ getWebpage url = do
 -- @content@: The content of the webpage.
 -- If your current label has not been tainted by data, the post is
 -- unconditional. Otherwise permitted only when the content's label
--- can flow to `dcPublic`.
+-- can flow to `True %% True`.
 postWebpage :: Url -> DCLabeled String -> DC ()
 postWebpage url content = do
   assertWrite (labelOf content) dcPublic

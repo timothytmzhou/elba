@@ -6,8 +6,8 @@ import Agents (mkAgent)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
-import LIO (LIOState (..), evalLIO, label, unlabel)
-import LIO.DCLabel (DC, DCLabel, cFalse, cTrue, dcPublic, (%%), (/\), (\/))
+import LIO (LIOState (..), evalLIO, getLabel, label, unlabel)
+import LIO.DCLabel (DC, DCLabel, cFalse, cTrue, (%%), (/\), (\/))
 import LIO.Labeled (lAp, lFmap)
 import LLM (Config (..), defaultConfig, defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
@@ -47,12 +47,12 @@ agentEnv =
        , 'getWebpage
        , 'postWebpage
          -- LIO API
+       , 'getLabel
        , 'label
        , 'unlabel
        , 'lFmap
        , 'lAp
        , 'toLabeled
-       , 'dcPublic
        , '(%%)
        , '(/\)
        , '(\/)
