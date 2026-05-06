@@ -1,10 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
-
--- LIO-secured wrapper around `WebTCB`. `getWebpage` is a read-and-write
--- (the URL goes out to a public sink, the response comes back tainted
--- with `dcPublic`). `postWebpage` is a write of arbitrary content to
--- the public sink.
 
 module Web
   ( Url
@@ -12,30 +6,37 @@ module Web
   , postWebpage
   ) where
 
-import LIO (guardAlloc, guardWrite)
-import LIO.Concurrent (lWait)
-import LIO.DCLabel (DC, dcPublic)
-import LIO.TCB (ioTCB)
-import Slack (DCLabeled)
+import LIO (guardAlloc)
+import LIO.DCLabel (CNF, dcPublic, toCNF)
+import LIO.Labeled (labelOf, labelP, unlabelP)
+import LIO.TCB (Priv (PrivTCB), ioTCB)
+import Slack (DC, DCLabeled, assertWrite)
 import WebTCB (Url)
 import WebTCB qualified
 
+omniPriv :: Priv CNF
+omniPriv = PrivTCB (toCNF False)
+
 -- | Returns the content of the webpage at a given URL.
 -- @url@: The URL of the webpage.
--- guardWrites at `dcPublic`: the URL is written to a public sink, and
--- the response taints the current label with `dcPublic`.
-getWebpage :: Url -> DC String
-getWebpage u = do
-  guardWrite dcPublic
-  ioTCB (WebTCB.getWebpage u)
+-- Permitted only when your current secrecy is public. Returns the
+-- content labeled at `dcPublic`. The call itself does not raise your
+-- current label; subsequently `unlabel`ing the result raises it to
+-- `dcPublic`.
+getWebpage :: Url -> DC (DCLabeled String)
+getWebpage url = do
+  guardAlloc dcPublic
+  content <- ioTCB (WebTCB.getWebpage url)
+  labelP omniPriv dcPublic content
 
 -- | Posts a webpage at a given URL with the given content.
 -- @url@: The URL of the webpage.
--- @content@: The content of the webpage as a `DCLabeled String`.
--- guardAllocs at `dcPublic` (the public-web sink label), then `lWait`s
--- the content.
+-- @content@: The content of the webpage.
+-- If your current label has not been tainted by data, the post is
+-- unconditional. Otherwise permitted only when the content's label
+-- can flow to `dcPublic`.
 postWebpage :: Url -> DCLabeled String -> DC ()
-postWebpage url dlc = do
-  guardAlloc dcPublic
-  content <- lWait dlc
-  ioTCB (WebTCB.postWebpage url content)
+postWebpage url content = do
+  assertWrite (labelOf content) dcPublic
+  content' <- unlabelP omniPriv content
+  ioTCB (WebTCB.postWebpage url content')

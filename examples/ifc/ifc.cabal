@@ -5,11 +5,15 @@ synopsis:      Bindings for AgentDojo's slack default suite
 license:       MIT
 build-type:    Simple
 
+extra-source-files:
+  IfcGuidance.md
+
 library
   exposed-modules:
     Bridge
     Slack
     SlackTCB
+    ToLabeled
     Web
     WebTCB
 
@@ -43,18 +47,16 @@ executable agentdojo-slack-secure
   build-depends:
     agents,
     base >= 4.20 && < 5,
+    filepath,
     ifc,
     lio,
     template-haskell
 
-executable env-test
-  main-is:          EnvTest.hs
-  hs-source-dirs:   .
+executable slack-tests
+  main-is:          Tests.hs
+  hs-source-dirs:   tests
   default-language: GHC2024
   build-depends:
-    agents,
     base >= 4.20 && < 5,
-    hint,
     ifc,
-    lio,
-    template-haskell
+    lio
