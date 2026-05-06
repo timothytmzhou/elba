@@ -6,50 +6,34 @@ let-bindings). You may use Prelude and the listed allowed functions.
 
 # Delegating to a sub-agent
 
-Two helpers spawn a fresh LLM turn:
+`subagent :: Typeable a => String -> String -> a` spawns a fresh LLM
+turn returning a value of the annotated type. The two arguments are
+the sub-agent's task instructions and a single data string (use `show`
+or `Text.Printf.printf` to construct it). The data appears in an
+`<input>` section of the sub-agent's prompt.
 
-    agent   :: Typeable a => String -> a
-    observe :: (Show a, Typeable b) => a -> String -> b
+Use `subagent` to **observe, think about, and act on** computed
+values. The common shape: bind the result of a computation to a
+variable (with `<-` or `let`), then pass that variable in as the data
+argument for a data-dependent decision, then act on the answer
+yourself. Make some progress before delegating; your output must not
+be a bare `subagent` call that forwards the whole problem to another
+round.
 
-`agent prompt` returns a value of the annotated type. `observe value
-prompt` is sugar for an `agent` call that also passes `show value` to
-the sub-agent. The annotated type may be pure (`Int`, `[String]`,
-`MyRecord`) or effectful (`IO a`); when it's `IO a` the sub-agent's
-expression runs in `IO` and you bind it with `<-`, like any other IO
-action. Always annotate the result, e.g. `agent "..." :: Int` —
-without an annotation GHC cannot infer the type and compilation
-fails.
+Always annotate the result, e.g. `subagent "..." "..." :: IO String` —
+without an annotation GHC cannot infer the type and compilation fails.
 
-`observe` is for inspecting an intermediate value in a multi-step
-expression:
+The sub-agent shares your allowed functions and language extensions,
+but sees only the two strings you pass — not your surrounding code,
+your variables, or values you have already computed. Pass any data the
+sub-agent needs as the second argument.
 
-    do  xs <- someTool ...
-        let y = observe xs "..." :: t            -- pure: bind with `let`
-        z  <- observe xs "..." :: IO a           -- effectful: bind with `<-`
-        nextStep y z
-
-Use `agent` when no value is involved (e.g. "pick a friendly
-greeting").
-
-Always make some progress yourself before delegating. Construct
-whatever structure, control flow, and computation you can, and let
-`observe`/`agent` fill in only the data-dependent parts. Your output
-expression must not be a bare `observe`/`agent` call that just
-forwards the whole problem to another round.
-
-# Writing sub-agent prompts
-
-The sub-agent sees only your prompt and (for `observe`) the value's
-`show` — not your broader task, code, or surrounding variables. State
-exactly what to extract and in what format. For each component of a
-structured return type, say what it represents and what shape it
-should take. For example, prefer
-
-    observe text "Extract the 4-digit year (e.g. 2024) and return it as an Int" :: Int
-
-over
-
-    observe text "Get the year" :: Int
+    do raw   <- getLine
+       topic <- subagent
+                  "Identify the topic in one word."
+                  (show raw)
+                :: IO String
+       putStrLn ("topic: " ++ topic)
 
 # Retry
 

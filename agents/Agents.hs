@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 
 module Agents
@@ -15,22 +14,7 @@ import LLM
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
-import Language.Haskell.TH (runIO)
-import Language.Haskell.TH.Syntax qualified as TH
-import System.FilePath (takeDirectory, (</>))
 import Log (Event (..), Log, logEvent, withLog)
-
--- The prompt body lives in SystemPrompt.md so it can be edited as prose.
--- `addDependentFile` triggers a rebuild whenever that file changes.
-systemPrompt :: String
-systemPrompt =
-  $( do
-      loc <- TH.location
-      let path = takeDirectory (TH.loc_filename loc) </> "SystemPrompt.md"
-      TH.addDependentFile path
-      contents <- runIO (readFile path)
-      TH.lift contents
-   )
 
 buildContext :: forall a. (Typeable a) => Proxy a -> TypeEnv -> String -> String
 buildContext proxy typeEnv task =
@@ -78,13 +62,13 @@ mkAgent config _ _
   | LLM.maxDepth config <= 0 = error "Agents.mkAgent: recursion depth exceeded"
 mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
-    ask <- withSession config {LLM.systemPrompt = Agents.systemPrompt}
+    ask <- withSession config
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
       typeEnv <- setEnv env baseModules
       let ctx = buildContext (Proxy :: Proxy a) typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
-      liftIO (logEvent lg (Request Agents.systemPrompt ctx requiredType))
+      liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
       liftIO (logEvent lg (Response code))
       runAttempt lg ask code 0
     case result of
@@ -120,8 +104,7 @@ mkAgent config env userPrompt = unsafePerformIO $
     wrapper =
       (++)
         "\\config env -> \
-        \let agent :: Typeable a => String -> a; \
-        \    agent prompt = mkAgent config{maxDepth = maxDepth config - 1} env prompt; \
-        \    observe :: (Show a, Typeable b) => a -> String -> b; \
-        \    observe v p = agent (\"Input value:\\n\" ++ show v ++ \"\\n\\nTask: \" ++ p) \
+        \let subagent :: Typeable a => String -> String -> a; \
+        \    subagent task input = mkAgent config{maxDepth = maxDepth config - 1} env \
+        \      (task ++ \"\\n<input>\\n\" ++ input ++ \"\\n</input>\") \
         \in\n"
