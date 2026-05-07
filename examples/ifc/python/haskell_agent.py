@@ -21,12 +21,15 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 from collections.abc import Sequence
 from typing import Any
 
+TASK_TIMEOUT_S = 600  # 10 minutes per task; watchdog kills the haskell child
+
 from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
-from agentdojo.types import ChatAssistantMessage, ChatMessage, TextContentBlock
+from agentdojo.types import ChatAssistantMessage, ChatMessage, ChatUserMessage, TextContentBlock
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -73,19 +76,35 @@ class HaskellAgentPipeline(BasePipelineElement):
         )
         assert proc.stdin is not None and proc.stdout is not None
 
+        timed_out = threading.Event()
+
+        def _watchdog() -> None:
+            if proc.poll() is None:
+                timed_out.set()
+                proc.kill()
+
+        watchdog = threading.Timer(TASK_TIMEOUT_S, _watchdog)
+        watchdog.start()
         try:
             self._send(proc, {"prompt": query})
             answer, succeeded, tool_calls = self._loop(proc, runtime, env)
         except Exception:
             proc.kill()
-            raise
+            if timed_out.is_set():
+                msg = f"task exceeded {TASK_TIMEOUT_S}s timeout"
+                print(f"[haskell-agent timeout] {msg}", file=sys.stderr, flush=True)
+                answer, succeeded, tool_calls = msg, False, []
+            else:
+                raise
         finally:
+            watchdog.cancel()
             proc.stdin.close()
             proc.wait(timeout=5)
 
         content_blocks = [TextContentBlock(type="text", content=answer)]
         new_messages = list(messages) + [
-            ChatAssistantMessage(role="assistant", content=content_blocks, tool_calls=tool_calls)
+            ChatUserMessage(role="user", content=[TextContentBlock(type="text", content=query)]),
+            ChatAssistantMessage(role="assistant", content=content_blocks, tool_calls=tool_calls),
         ]
         return answer, runtime, env, new_messages, extra_args
 

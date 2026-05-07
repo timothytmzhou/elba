@@ -9,3 +9,4 @@ CLAUDE.md
 .ghc.environment.*
 logs/
 *.pyc
+camel/
