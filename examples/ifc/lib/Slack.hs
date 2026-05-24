@@ -5,7 +5,11 @@ module Slack
     DCLabeled,
     Body,
     Message (..),
-    assertWrite,
+    channelLabel,
+    public,
+    secret,
+    trusted,
+    untrusted,
     getChannels,
     readChannelMessages,
     readInbox,
@@ -18,135 +22,122 @@ module Slack
   )
 where
 
-import Control.Monad (unless)
-import LIO (canFlowTo, getLabel, guardAlloc, taint)
-import LIO.DCLabel (CNF, DC, DCLabel, cFalse, dcIntegrity, toCNF, (%%), (\/))
-import LIO.Error (labelError)
-import LIO.Labeled (Labeled, labelOf, labelP, unlabelP)
-import LIO.TCB (Priv (PrivTCB), ioTCB)
+import qualified Data.ByteString.Char8 as S8
+import Data.Map (Map)
+import qualified Data.Map as Map
+import LIO (taint)
+import LIO.DCLabel (CNF, DC, DCLabel, Principal, cFalse, cTrue, principalBS, (%%))
+import LIO.TCB (ioTCB)
+import Policy (DCLabeled, relabelTCB, rewriteLabel)
+import qualified Policy
 import SlackTCB (Body, Message (..))
 import SlackTCB qualified
 
-type DCLabeled a = Labeled DCLabel a
+-- | Channel principal → member principals; user principal → [itself].
+slackGroups :: DC (Map Principal [Principal])
+slackGroups = do
+  channels <- ioTCB SlackTCB.getChannels
+  membership <- ioTCB (traverse fetchMembers channels)
+  let p = principalBS . S8.pack
+      channelEntries = [(p c, map p us) | (c, us) <- membership]
+      userEntries    = [(p u, [p u])    | (_, us) <- membership, u <- us]
+  pure (Map.fromList (channelEntries ++ userEntries))
+  where
+    fetchMembers c = do
+      us <- SlackTCB.getUsersInChannel c
+      pure (c, us)
 
--- Internal helpers backed by an omnipotent priv. Not exported.
---   `relabelTCB` packages a value at an arbitrary label without
---   requiring `current ⊑ label`.
---   `unlabelTCB` extracts a `DCLabeled` value without raising current.
-relabelTCB :: DCLabel -> a -> DC (DCLabeled a)
-relabelTCB = labelP (PrivTCB (toCNF False))
+-- | Rewriter that expands channel principals to member CNFs.
+expandChannelLabels :: DC (DCLabel -> DCLabel)
+expandChannelLabels = do
+  m <- slackGroups
+  pure (rewriteLabel m)
 
-unlabelTCB :: DCLabeled a -> DC a
-unlabelTCB = unlabelP (PrivTCB (toCNF False))
+-- | The canonical label for a channel — secrecy and integrity both
+-- bound to that channel's principal. Useful as a @toLabeled@ wrap
+-- when the inner action only reads from this one channel.
+channelLabel :: String -> DCLabel
+channelLabel channel = channel %% channel
 
--- | Write-side policy check. If current integrity is `cFalse`
--- (untainted, i.e. the agent has not absorbed any external data),
--- writes are unconditional. Otherwise require @dataLabel ⊑ sinkLabel@.
--- Raises a LabelError if neither holds.
-assertWrite :: DCLabel -> DCLabel -> DC ()
-assertWrite dataLabel sinkLabel = do
-  current <- getLabel
-  let bypass = dcIntegrity current == cFalse
-  unless (bypass || canFlowTo dataLabel sinkLabel) $
-    labelError "assertWrite" [dataLabel, sinkLabel]
+-- | Secrecy: anyone may read.
+public :: CNF
+public = cTrue
 
-channelLabelTCB :: String -> DC DCLabel
-channelLabelTCB channel = do
-  users <- ioTCB (SlackTCB.getUsersInChannel channel)
-  let channelCnf = foldr (\/) cFalse users
-  return (channelCnf %% channelCnf)
+-- | Secrecy: nobody may read.
+secret :: CNF
+secret = cFalse
 
--- | Get the list of channels in the slack.
--- Returns the list labeled at `True %% True`. Does not raise your
--- current label.
+-- | Integrity: endorsed (data has not been tainted by external content).
+trusted :: CNF
+trusted = cFalse
+
+-- | Integrity: no endorsement (data could be from anywhere).
+untrusted :: CNF
+untrusted = cTrue
+
+-- | List the channels in the workspace.
 getChannels :: DC (DCLabeled [String])
 getChannels = do
   channels <- ioTCB SlackTCB.getChannels
   let l = True %% True
   relabelTCB l channels
 
--- | Read the messages from the given channel.
--- @channel@: The channel to read the messages from.
--- Let `c` be the disjunction of users currently in the channel.
--- Returns the messages labeled at `c %% c`, and raises your current
--- label to `c %% c`.
+-- | Read the messages from @channel@. Raises the current label to the channel's label.
 readChannelMessages :: String -> DC (DCLabeled [Message])
 readChannelMessages channel = do
   msgs <- ioTCB (SlackTCB.readChannelMessages channel)
-  l <- channelLabelTCB channel
-  taint l -- the messages label itself says who is in the channel
+  let l = channelLabel channel
+  taint l
   relabelTCB l msgs
 
--- | Read the messages from the given user inbox.
--- @user@: The user whose inbox to read.
--- Returns the messages labeled at `user %% user`.
+-- | Read @user@'s inbox. Does not raise current; the returned value is labeled.
 readInbox :: String -> DC (DCLabeled [Message])
 readInbox user = do
   msgs <- ioTCB (SlackTCB.readInbox user)
   let l = user %% user
   relabelTCB l msgs
 
--- | Get the list of users in the given channel.
--- @channel@: The channel to get the users from.
--- Let `c` be the disjunction of users currently in the channel.
--- Returns the user list labeled at `c %% c` and raises your current label to `c %% c`.
+-- | List the users in @channel@. Raises the current label to the channel's label.
 getUsersInChannel :: String -> DC (DCLabeled [String])
 getUsersInChannel channel = do
   users <- ioTCB (SlackTCB.getUsersInChannel channel)
-  l <- channelLabelTCB channel
-  taint l -- the label of users itself says who is in the channel
+  let l = channelLabel channel
+  taint l
   relabelTCB l users
 
--- | Add a user to a given channel.
--- @user@: The user to add to the channel.
--- @channel@: The channel to add the user to.
--- Rejected at runtime if your integrity has been tainted by
--- external data.
+-- | Add @user@ to @channel@. Requires current to be trusted.
 addUserToChannel :: String -> String -> DC ()
 addUserToChannel user channel = do
-  guardAlloc (False %% False)
+  expand <- expandChannelLabels
+  Policy.guard expand (False %% False)
   ioTCB (SlackTCB.addUserToChannel user channel)
 
--- | Invites a user to the Slack workspace.
--- @user@: The user to invite.
--- @user_email@: The user email where invite should be sent.
--- Rejected at runtime if your integrity has been tainted by
--- external data.
+-- | Invite @user@ at @user_email@ to the workspace. Requires current to be trusted.
 inviteUserToSlack :: String -> String -> DC ()
 inviteUserToSlack user user_email = do
-  guardAlloc (False %% False)
+  expand <- expandChannelLabels
+  Policy.guard expand (False %% False)
   ioTCB (SlackTCB.inviteUserToSlack user user_email)
 
--- | Remove a user from the Slack workspace.
--- @user@: The user to remove.
--- Rejected at runtime if your integrity has been tainted by
--- external data.
+-- | Remove @user@ from the workspace. Requires current to be trusted.
 removeUserFromSlack :: String -> DC ()
 removeUserFromSlack user = do
-  guardAlloc (False %% False)
+  expand <- expandChannelLabels
+  Policy.guard expand (False %% False)
   ioTCB (SlackTCB.removeUserFromSlack user)
 
--- | Send a direct message from the bot to @recipient@ with the given @body@.
--- @recipient@: The recipient of the message.
--- @body@: The body of the message.
--- If your current label has not been tainted by data, the send is
--- unconditional. Otherwise permitted only when the body's label can
--- flow to the recipient's label.
-sendDirectMessage :: String -> DCLabeled Body -> DC ()
-sendDirectMessage recipient body = do
-  assertWrite (labelOf body) (recipient %% recipient)
-  body' <- unlabelTCB body
-  ioTCB (SlackTCB.sendDirectMessage recipient body')
+-- | The DM-sink label for a recipient: secret to that user, attested by that user.
+userLabel :: String -> DC DCLabel
+userLabel user = pure (user %% user)
 
--- | Send a channel message from the bot to @channel@ with the given @body@.
--- @channel@: The channel to send the message to.
--- @body@: The body of the message.
--- If your current label has not been tainted by data, the send is
--- unconditional. Otherwise permitted only when the body's label can
--- flow to the channel's label.
-sendChannelMessage :: String -> DCLabeled Body -> DC ()
-sendChannelMessage channel body = do
-  sinkLabel <- channelLabelTCB channel
-  assertWrite (labelOf body) sinkLabel
-  body' <- unlabelTCB body
-  ioTCB (SlackTCB.sendChannelMessage channel body')
+-- | Send a DM with @labeledBody@ to @labeledRecipient@.
+sendDirectMessage :: DCLabeled String -> DCLabeled Body -> DC ()
+sendDirectMessage labeledRecipient labeledBody = do
+  expand <- expandChannelLabels
+  Policy.write expand userLabel SlackTCB.sendDirectMessage labeledRecipient labeledBody
+
+-- | Post @labeledBody@ to @labeledChannel@.
+sendChannelMessage :: DCLabeled String -> DCLabeled Body -> DC ()
+sendChannelMessage labeledChannel labeledBody = do
+  expand <- expandChannelLabels
+  Policy.write expand (pure . channelLabel) SlackTCB.sendChannelMessage labeledChannel labeledBody

@@ -11,6 +11,7 @@ extra-source-files:
 library
   exposed-modules:
     Bridge
+    Policy
     Slack
     SlackTCB
     ToLabeled
@@ -54,6 +55,23 @@ executable agentdojo-slack-secure
 
 executable slack-tests
   main-is:          Tests.hs
+  hs-source-dirs:   tests
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    ifc,
+    lio
+
+executable agentdojo-slack-reference
+  main-is:          Reference.hs
+  hs-source-dirs:   tests
+  default-language: GHC2024
+  build-depends:
+    base >= 4.20 && < 5,
+    ifc
+
+executable agentdojo-slack-secure-reference
+  main-is:          SecureReference.hs
   hs-source-dirs:   tests
   default-language: GHC2024
   build-depends:

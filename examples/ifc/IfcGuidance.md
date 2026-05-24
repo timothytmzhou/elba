@@ -2,75 +2,62 @@
 
 Your expression has type `DC a` — an `LIO DCLabel` action.
 
-## Labeled values
+## Labels
 
-A `DCLabeled a` is an `a` tagged with a label that carries both
-secrecy information ("which principals are allowed to observe
-this") and integrity information ("which principals endorsed
-this"). Reads from external sources return `DCLabeled` values
-rather than plain ones, so the taint is visible in the type and
-you cannot use the underlying value without acknowledging it.
+A `DCLabel` is written `secrecy %% integrity`:
 
-## Current Labels
-Your computation has a floating current label which will be raised by
-read operations.
+- **secrecy** — which principals may read the value.
+- **integrity** — which principals endorsed the value.
 
-`unlabel :: DCLabeled a -> DC a` extracts the underlying value *and*
-raises your current label by that value's label.
+Named components you can use with `%%`:
 
-While your current label has not been tainted by data — i.e. its
-integrity component is still `cFalse` — every write tool (sends,
-posts, invites, adds, removes) is unconditional regardless of the
-body's label or the sink's restrictions. Plan greedily: do all the
-writes you can with literal or already-labeled arguments before you
-read anything that taints integrity.
+- `public` / `secret` — for the secrecy component.
+- `trusted` / `untrusted` — for the integrity component.
 
-Once your current integrity has been tainted, send tools (direct
-messages, channel messages, web posts) additionally require the
-body's label to flow to the sink's label, and identity-mutating
-writes (invite/remove/add-user) are rejected outright. To convert a
-plain value (e.g. a literal body) into a `DCLabeled` labeled with the same current label, read your
-current label with `getLabel` and pass it to `label` — i.e.
-`do { l <- getLabel; b <- label l x; ... }`.
+A `DCLabeled a` is an `a` tagged with a `DCLabel`. Reads return
+`DCLabeled` values, so the taint is visible in the type.
 
-## Quarantining a tainted computation with `toLabeled`
+## Current label and `unlabel`
+
+Your computation has a floating *current label*; read it with
+`getLabel :: DC DCLabel`. It is raised by `unlabel`:
+
+    unlabel :: DCLabeled a -> DC a
+
+`unlabel` extracts the underlying value and raises the current
+label by that value's label.
+
+## State-changing tools
+
+Writes that take a `DCLabeled` argument check three things: the
+integrity of that argument, the label of the data, and the current
+label. Maximize the integrity of the labeled argument — labeling
+with the current label (rather than constructing a fresh one)
+gives the most integrity available at that point.
+
+Writes that take plain (unlabeled) arguments unconditionally
+require current to be trusted.
+
+## `toLabeled`
 
     toLabeled :: DCLabel -> DC a -> DC (Labeled DCLabel a)
 
-`toLabeled lbl action` runs `action`, captures its result as a
-`DCLabeled a` at label `lbl`, and *restores* the parent's current
-label when it returns. The taint stays inside the labeled result,
-so your parent scope keeps clean integrity and can still perform
-writes.
+`toLabeled lbl action` quarantines `action` inside a label `lbl`
+you supply. `lbl` must be at or above the current label. The inner
+action's taint stays inside the returned `DCLabeled` value.
 
-You should generally wrap any `subagent` call that reads or unlabels
-external data in `toLabeled` so the taint stays inside the labeled
-result. Prefer annotating subagents as `:: DC a` so they can call
-tools — their tool calls run in your DC scope under the same policy,
-so there's no security cost to giving them tool access.
-
-The wrap label `lbl` must sit at or above your current label both
-before the bracket runs and at the end of the inner action — i.e.
-both `current ⊑ lbl` at entry and `inner_final ⊑ lbl` at exit. If
-either is violated the wrap fails. The returned value is `DCLabeled`
-at `lbl`, so any write that consumes it sees that label.
-
-Two common picks:
-
-- `False %% True` (top of the lattice) is the most permissive `lbl`
-  for role 1 — any inner flow is accepted. The cost is that the
-  returned value sits at the top and can only reach a sink via the
-  untainted-current bypass; once your parent is tainted, this value
-  is no longer sendable.
-
-- A more specific label — typically `labelOf x` for some `x` read
-  inside the bracket, or a CNF derived from one — keeps the result
-  sendable to matching sinks even after the parent has been tainted,
-  but the wrap check will fail if the inner action ends up labeled
-  above `lbl`.
-
-    body <- toLabeled (False %% True) $ do
+    body <- toLabeled (secret %% untrusted) $ do
               page <- getWebpage url
               raw  <- unlabel page
-              pure (subagent (printf "Summarize %s." (show raw))
-                      :: String)
+              pure (subagent "Summarize this." raw :: String)
+
+Generally wrap `subagent` calls in `toLabeled` — a subagent may
+read or unlabel external data and the wrap keeps that taint
+contained.
+
+## Separate via `toLabeled`
+
+Separate independent computations into their own `toLabeled` blocks
+to keep taint from spreading between them. Each block should be
+self-contained — do only the reads and unlabels for one logical
+unit so its wrap label can stay tight.

@@ -32,6 +32,12 @@ agentEnv =
        , ''DCLabeled
          -- Web type
        , ''Url
+         -- Label components
+       , 'public
+       , 'secret
+       , 'trusted
+       , 'untrusted
+       , 'channelLabel
          -- Slack reads
        , 'getChannels
        , 'readChannelMessages

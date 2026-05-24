@@ -1,22 +1,24 @@
-"""Driver for the slack IFC tests.
+"""Driver for the slack IFC tests and reference programs.
 
-Each test is a named entry point in the `slack-tests` Haskell binary
-(see Tests.hs). For each test, this script:
+Two flavors of test, run through the same JSONL bridge protocol against
+agentdojo's slack environment:
 
-  1. Loads a fresh copy of AgentDojo's slack environment.
-  2. Spawns `slack-tests <test-name>` as a subprocess.
-  3. Speaks the same JSONL bridge protocol as `haskell_agent.py`,
-     dispatching `call` messages to AgentDojo's `runtime.run_function`.
-  4. Reads the terminal `done` / `failed` and prints PASS / FAIL.
+  IFC tests (slack-tests binary): each test name maps to one DC
+    computation. Pass/fail is decided by the test binary itself; the
+    driver just relays.
 
-No LLM is involved. The test binary itself decides whether each test
-"passed" by checking if the IFC outcome matches the expectation
-encoded in the test name (`pass-*` vs `fail-*`).
+  Reference tests (agentdojo-slack-reference binary): one hand-coded
+    `IO String` program per user_task. Pass/fail is decided by calling
+    agentdojo's per-task `utility(...)` / `utility_from_traces(...)`
+    against the env state mutated by the bridge round-trip.
+
+Environments come from agentdojo (`get_suite(...).load_and_inject_default_environment({})`);
+they are never hand-written here.
 
 Usage:
-    python run_tests.py                      # run all tests
-    python run_tests.py pass-simple-send ... # run named tests
-    python run_tests.py --exe /path/to/exe   # override binary path
+    python run_tests.py                            # run all tests
+    python run_tests.py pass-simple-send ...       # run named tests
+    python run_tests.py ref-user_task_5            # filter to a reference
 """
 
 from __future__ import annotations
@@ -26,25 +28,27 @@ import json
 import shutil
 import subprocess
 import sys
+from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from agentdojo.functions_runtime import FunctionsRuntime
+from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
 from agentdojo.task_suite.load_suites import _SUITES, get_suite
 from packaging.version import Version
 
 DEFAULT_SUITE = "slack"
+NUM_USER_TASKS = 21
 
-ALL_TESTS = [
-    "pass-simple-send",
-    "pass-forward-labeled",
-    "pass-tolabeled-web-slack",
-    "pass-tolabeled-web-web",
-    "fail-unlabel-then-send",
-    "fail-web-read-then-slack",
-    "fail-unlabel-slack-post-web",
-    "fail-web-read-then-post",
-]
+
+@dataclass(frozen=True)
+class TestSpec:
+    label: str
+    exe_target: str
+    argv: list[str]
+    prompt: str
+    # (bridge_ok, bridge_msg, pre_env, post_env, traces) -> (passed, note)
+    assess: Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -61,22 +65,35 @@ def _latest_benchmark_version() -> str:
     return max(_SUITES.keys(), key=lambda v: Version(v.lstrip("v")))
 
 
-def _default_exe_path() -> str:
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+_exe_cache: dict[str, str] = {}
+
+
+def _resolve_exe(target: str) -> str:
+    """`cabal list-bin <target>` with a small cache."""
+    if target in _exe_cache:
+        return _exe_cache[target]
     cabal = shutil.which("cabal")
     if cabal is None:
-        sys.exit("cabal not on PATH; pass --exe explicitly")
+        sys.exit("cabal not on PATH; cannot resolve target binaries")
     out = subprocess.check_output(
-        [cabal, "list-bin", "slack-tests"],
-        cwd=Path(__file__).resolve().parents[3],  # repo root
+        [cabal, "list-bin", target],
+        cwd=_repo_root(),
         text=True,
     )
-    return out.strip().splitlines()[-1]
+    path = out.strip().splitlines()[-1]
+    _exe_cache[target] = path
+    return path
 
 
-def _run_one(exe_path: str, test_name: str, runtime: FunctionsRuntime, env: Any) -> tuple[bool, str]:
-    """Run a single test and return (passed, message)."""
+def _run_one(spec: TestSpec, runtime: FunctionsRuntime, env: Any) -> tuple[bool, str, list[FunctionCall]]:
+    """Spawn the binary, speak the bridge, return (bridge_ok, bridge_msg, traces)."""
+    exe_path = _resolve_exe(spec.exe_target)
     proc = subprocess.Popen(
-        [exe_path, test_name],
+        [exe_path, *spec.argv],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         text=True,
@@ -84,21 +101,22 @@ def _run_one(exe_path: str, test_name: str, runtime: FunctionsRuntime, env: Any)
     )
     assert proc.stdin is not None and proc.stdout is not None
 
+    traces: list[FunctionCall] = []
     try:
-        # The bridge expects a prompt line first; tests don't use it.
-        proc.stdin.write(json.dumps({"prompt": ""}) + "\n")
+        proc.stdin.write(json.dumps({"prompt": spec.prompt}) + "\n")
         proc.stdin.flush()
         while True:
             line = proc.stdout.readline()
             if not line:
                 rc = proc.poll()
-                return False, f"child closed stdout (exit code {rc})"
+                return False, f"child closed stdout (exit code {rc})", traces
             msg = json.loads(line)
             if "call" in msg:
                 method = msg["call"]
                 args = msg.get("args") or {}
                 if not isinstance(args, dict):
                     args = {}
+                traces.append(FunctionCall(function=method, args=args))
                 result, error = runtime.run_function(env, method, args)
                 if error is None:
                     proc.stdin.write(json.dumps({"ok": _to_jsonable(result)}) + "\n")
@@ -106,13 +124,11 @@ def _run_one(exe_path: str, test_name: str, runtime: FunctionsRuntime, env: Any)
                     proc.stdin.write(json.dumps({"err": error}) + "\n")
                 proc.stdin.flush()
             elif "done" in msg:
-                # The Haskell test reports its own outcome via `done` on
-                # success and `failed` on outcome-mismatch.
-                return True, msg["done"]
+                return True, msg["done"], traces
             elif "failed" in msg:
-                return False, msg["failed"]
+                return False, msg["failed"], traces
             else:
-                return False, f"unknown bridge message: {msg!r}"
+                return False, f"unknown bridge message: {msg!r}", traces
     finally:
         try:
             proc.stdin.close()
@@ -124,34 +140,135 @@ def _run_one(exe_path: str, test_name: str, runtime: FunctionsRuntime, env: Any)
             proc.kill()
 
 
+def _assess_ifc(ok: bool, msg: str, _pre: Any, _post: Any, _traces: list[FunctionCall]) -> tuple[bool, str]:
+    return ok, msg
+
+
+def _build_ifc_specs() -> list[TestSpec]:
+    names = [
+        "pass-tolabeled-web-web",
+        "fail-unlabel-then-send",
+        "fail-web-read-then-slack",
+        "fail-unlabel-slack-post-web",
+    ]
+    return [
+        TestSpec(
+            label=n,
+            exe_target="slack-tests",
+            argv=[n],
+            prompt="",
+            assess=_assess_ifc,
+        )
+        for n in names
+    ]
+
+
+def _make_reference_assess(task: Any) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
+    def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
+        if not ok:
+            return False, f"bridge error: {msg}"
+        try:
+            passed = task.utility(msg, pre, post)
+        except NotImplementedError:
+            passed = task.utility_from_traces(msg, pre, post, traces)
+        return bool(passed), "" if passed else "utility=False"
+
+    return assess
+
+
+def _make_secref_assess(task: Any) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
+    """Secure-reference assessor: a 'blocked by IFC' done message counts as PASS
+    (the task's @expectedOutcome@ is @ExpectLabelError@ and the Haskell main
+    converted the raised LabelError into a successful 'blocked by IFC' done).
+    Otherwise behave like the standard reference assessor."""
+    def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
+        if ok and msg == "blocked by IFC":
+            return True, "blocked by IFC (expected)"
+        if not ok:
+            return False, f"bridge error: {msg}"
+        try:
+            passed = task.utility(msg, pre, post)
+        except NotImplementedError:
+            passed = task.utility_from_traces(msg, pre, post, traces)
+        return bool(passed), "" if passed else "utility=False"
+
+    return assess
+
+
+def _build_reference_specs(suite: Any) -> list[TestSpec]:
+    specs = []
+    for i in range(NUM_USER_TASKS):
+        tid = f"user_task_{i}"
+        task = suite.user_tasks[tid]
+        specs.append(
+            TestSpec(
+                label=f"ref-{tid}",
+                exe_target="agentdojo-slack-reference",
+                argv=["--task", tid],
+                prompt=task.PROMPT,
+                assess=_make_reference_assess(task),
+            )
+        )
+    return specs
+
+
+def _build_secure_reference_specs(suite: Any) -> list[TestSpec]:
+    specs = []
+    for i in range(NUM_USER_TASKS):
+        tid = f"user_task_{i}"
+        task = suite.user_tasks[tid]
+        specs.append(
+            TestSpec(
+                label=f"secref-{tid}",
+                exe_target="agentdojo-slack-secure-reference",
+                argv=["--task", tid],
+                prompt=task.PROMPT,
+                assess=_make_secref_assess(task),
+            )
+        )
+    return specs
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("tests", nargs="*", help="Tests to run (default: all)")
-    parser.add_argument("--exe", default=None, help="Path to slack-tests binary")
+    parser.add_argument("tests", nargs="*", help="Test labels to run (default: all)")
     parser.add_argument("--benchmark-version", default=_latest_benchmark_version())
     args = parser.parse_args()
 
-    exe_path = args.exe or _default_exe_path()
-    print(f"Using test binary: {exe_path}\n", flush=True)
-
     suite = get_suite(args.benchmark_version, DEFAULT_SUITE)
-    tests = args.tests or ALL_TESTS
+    all_specs = (
+        _build_ifc_specs()
+        + _build_reference_specs(suite)
+        + _build_secure_reference_specs(suite)
+    )
+    by_label = {s.label: s for s in all_specs}
+
+    if args.tests:
+        selected = []
+        for name in args.tests:
+            if name not in by_label:
+                sys.exit(f"unknown test label: {name}")
+            selected.append(by_label[name])
+    else:
+        selected = all_specs
 
     passed_count = 0
     failed: list[str] = []
-    for test_name in tests:
-        # Fresh env per test so state doesn't leak across tests.
-        env = suite.load_and_inject_default_environment({})
+    for spec in selected:
+        pre_env = suite.load_and_inject_default_environment({})
+        post_env = deepcopy(pre_env)
         runtime = FunctionsRuntime(suite.tools)
-        ok, msg = _run_one(exe_path, test_name, runtime, env)
-        marker = "PASS" if ok else "FAIL"
-        print(f"  {marker}  {test_name}: {msg}", flush=True)
-        if ok:
+        bridge_ok, bridge_msg, traces = _run_one(spec, runtime, post_env)
+        passed, note = spec.assess(bridge_ok, bridge_msg, pre_env, post_env, traces)
+        marker = "PASS" if passed else "FAIL"
+        suffix = f": {note}" if note else ""
+        print(f"  {marker}  {spec.label}{suffix}", flush=True)
+        if passed:
             passed_count += 1
         else:
-            failed.append(test_name)
+            failed.append(spec.label)
 
-    print(f"\n{passed_count}/{len(tests)} tests passed", flush=True)
+    print(f"\n{passed_count}/{len(selected)} tests passed", flush=True)
     if failed:
         print("Failed: " + ", ".join(failed), flush=True)
     return 0 if not failed else 1

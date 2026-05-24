@@ -6,38 +6,26 @@ module Web
   , postWebpage
   ) where
 
-import LIO (getLabel)
-import LIO.DCLabel (CNF, dcPublic, toCNF)
-import LIO.Labeled (labelOf, labelP, unlabelP)
-import LIO.TCB (Priv (PrivTCB), ioTCB)
-import Slack (DC, DCLabeled, assertWrite)
+import LIO.DCLabel (DC, DCLabel, dcPublic)
+import Policy (DCLabeled, relabelTCB, write)
 import WebTCB (Url)
 import WebTCB qualified
 
-omniPriv :: Priv CNF
-omniPriv = PrivTCB (toCNF False)
+-- | The web is a single public sink, regardless of the URL.
+webLabel :: a -> DC DCLabel
+webLabel _ = pure dcPublic
 
--- | Returns the content of the webpage at a given URL.
--- @url@: The URL of the webpage.
--- If your current label has not been tainted by data, the call is
--- unconditional. Otherwise permitted only when your current secrecy
--- is public. Returns the content labeled at `True %% True`. Does
--- not raise your current label.
-getWebpage :: Url -> DC (DCLabeled String)
-getWebpage url = do
-  current <- getLabel
-  assertWrite current dcPublic
-  content <- ioTCB (WebTCB.getWebpage url)
-  labelP omniPriv dcPublic content
+-- | Fetch the page at @url@, ignoring the unused data slot (getWebpage uses
+-- the URL as both the sink pointer and the data).
+fetchPage :: Url -> a -> IO String
+fetchPage url _ = WebTCB.getWebpage url
 
--- | Posts a webpage at a given URL with the given content.
--- @url@: The URL of the webpage.
--- @content@: The content of the webpage.
--- If your current label has not been tainted by data, the post is
--- unconditional. Otherwise permitted only when the content's label
--- can flow to `True %% True`.
-postWebpage :: Url -> DCLabeled String -> DC ()
-postWebpage url content = do
-  assertWrite (labelOf content) dcPublic
-  content' <- unlabelP omniPriv content
-  ioTCB (WebTCB.postWebpage url content')
+-- | Fetch the content of @labeledUrl@. Result is labeled public/untrusted.
+getWebpage :: DCLabeled Url -> DC (DCLabeled String)
+getWebpage labeledUrl = do
+  content <- write id webLabel fetchPage labeledUrl labeledUrl
+  relabelTCB dcPublic content
+
+-- | Post @labeledContent@ to @labeledUrl@.
+postWebpage :: DCLabeled Url -> DCLabeled String -> DC ()
+postWebpage = write id webLabel WebTCB.postWebpage
