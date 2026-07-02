@@ -1,52 +1,79 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
 import Agents (mkAgent)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
+import Env (Env (..), defEnv)
+import IFC (DC, evalLIO, initialState, toLabeled, unlabel)
 import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
-import Env (Env (..), defEnv)
-import LLM (Config (..), defaultConfig)
+import LLM (Config (..), defaultConfig, defaultSystemPrompt)
+import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
-import SlackTCB
+import Language.Haskell.TH.Syntax qualified as TH
+import Slack
 import System.Environment (getArgs)
+import System.FilePath (takeDirectory, (</>))
 import TH (addTools)
 import Text.Printf (printf)
-import WebTCB
-
-$(deriveFromJSON defaultOptions ''Config)
+import Web
 
 agentEnv :: Env
 agentEnv =
   $( addTools
-       [ -- types: ''Body / ''Url / ''Message bring the corresponding
-         -- imports into scope without needing silentModules.
-         -- ''Message also brings the Message data constructor and its
-         -- field functions via reify-driven `Message(..)`.
+       [ -- Slack types
          ''Body
+       , ''LabeledMessage
+       , ''ChannelID
+       , ''UserID
+       , ''DC
+       , ''DCLabeled
+         -- Web type
        , ''Url
-       , ''Message
-         -- values
+         -- Slack ids
+       , 'channelName
+       , 'userName
+       , 'channelID
+       , 'userID
+         -- Slack reads
        , 'getChannels
-       , 'addUserToChannel
        , 'readChannelMessages
        , 'readInbox
-       , 'sendDirectMessage
-       , 'sendChannelMessage
+       , 'getUsersInChannel
+         -- Slack writes
+       , 'addUserToChannel
        , 'inviteUserToSlack
        , 'removeUserFromSlack
-       , 'getUsersInChannel
+       , 'sendDirectMessage
+       , 'sendChannelMessage
+         -- Web tools
        , 'getWebpage
        , 'postWebpage
+         -- IFC API
+       , 'unlabel
+       , 'toLabeled
          -- prompt formatting
        , 'printf
        ]
    )
-    defEnv {extensions = [OverloadedStrings]}
+    defEnv
+      { extensions = [OverloadedStrings]
+      , silentModules = ["IFC"]
+      }
+
+-- Information-flow guidance appended to the default system prompt.
+ifcGuidance :: String
+ifcGuidance =
+  $( do
+      loc <- TH.location
+      let path = takeDirectory (TH.loc_filename loc) </> ".." </> ".." </> "IfcGuidance.md"
+      TH.addDependentFile path
+      contents <- runIO (readFile path)
+      TH.lift contents
+   )
 
 parseLogPath :: [String] -> Maybe FilePath
 parseLogPath ("--log-path" : p : _) = Just p
@@ -57,6 +84,8 @@ parseConfigPath :: [String] -> Maybe FilePath
 parseConfigPath ("--config" : p : _) = Just p
 parseConfigPath (_ : rest) = parseConfigPath rest
 parseConfigPath [] = Nothing
+
+$(deriveFromJSON defaultOptions ''Config)
 
 loadConfig :: FilePath -> IO Config
 loadConfig path = do
@@ -69,11 +98,14 @@ main :: IO ()
 main = do
   args <- getArgs
   baseCfg <- maybe (pure defaultConfig) loadConfig (parseConfigPath args)
-  let cfg = baseCfg {logPath = parseLogPath args}
   withBridge $ do
     prompt <- readPrompt
-    let agentExpr = mkAgent cfg agentEnv prompt :: IO String
-    result <- try agentExpr :: IO (Either SomeException String)
+    let cfg = baseCfg
+          { logPath = parseLogPath args
+          , systemPrompt = defaultSystemPrompt ++ "\n" ++ ifcGuidance
+          }
+    let agentExpr = mkAgent cfg agentEnv prompt :: DC String
+    result <- try (evalLIO agentExpr initialState) :: IO (Either SomeException String)
     case result of
       Right answer -> sendDone answer
       Left (e :: SomeException) -> sendFailed (displayException e)
