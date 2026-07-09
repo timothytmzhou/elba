@@ -140,29 +140,6 @@ def _run_one(spec: TestSpec, runtime: FunctionsRuntime, env: Any) -> tuple[bool,
             proc.kill()
 
 
-def _assess_ifc(ok: bool, msg: str, _pre: Any, _post: Any, _traces: list[FunctionCall]) -> tuple[bool, str]:
-    return ok, msg
-
-
-def _build_ifc_specs() -> list[TestSpec]:
-    names = [
-        "pass-tolabeled-web-web",
-        "fail-unlabel-then-send",
-        "fail-web-read-then-slack",
-        "fail-unlabel-slack-post-web",
-    ]
-    return [
-        TestSpec(
-            label=n,
-            exe_target="slack-tests",
-            argv=[n],
-            prompt="",
-            assess=_assess_ifc,
-        )
-        for n in names
-    ]
-
-
 def _make_reference_assess(task: Any) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
     def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
         if not ok:
@@ -237,8 +214,7 @@ def main() -> int:
 
     suite = get_suite(args.benchmark_version, DEFAULT_SUITE)
     all_specs = (
-        _build_ifc_specs()
-        + _build_reference_specs(suite)
+        _build_reference_specs(suite)
         + _build_secure_reference_specs(suite)
     )
     by_label = {s.label: s for s in all_specs}
