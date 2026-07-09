@@ -10,3 +10,4 @@ CLAUDE.md
 logs/
 *.pyc
 camel/
+.notes/
