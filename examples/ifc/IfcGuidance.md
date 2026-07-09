@@ -1,63 +1,22 @@
-# Information flow
+# Information Flow Control
 
-Your expression has type `DC a` — an `LIO DCLabel` action.
+Your expression is inside the `DC` monad, a monad for enforcing information flow control (IFC) policies dynamically. This monad is implemented around three primary abstractions:
 
-## Labels
+- **labels** — data has a label describing both integrity (where it came from) and secrecy (who can read it)
+- **the current label** — the current label of the computation, representing an aggregate of all the data read
+- **clearance** — a bound on the secrecy of the current label
 
-A `DCLabel` is written `secrecy %% integrity`:
+IFC primitives you can use:
 
-- **secrecy** — which principals may read the value.
-- **integrity** — which principals endorsed the value.
+- **`unlabel`** — given labeled data, taints the current label's secrecy and integrity. We can think of this as lowering our privilege to match what the author of the data can do (to avoid having the data make us take a restricted action). Importantly, the current clearance is also lowered to match the integrity of the data.
+- **`toLabeled`** — given a `DC a`, spawns a separate scope where the action is run using the current label and clearance. This will not taint the current label; however, the result will be labeled.
 
-Named components you can use with `%%`:
+# Policies on Tools
 
-- `public` / `secret` — for the secrecy component.
-- `trusted` / `untrusted` — for the integrity component.
+Policies on tools check that the current integrity can perform the required action. Some tools which make writes take in labeled data, to avoid needing to unlabel the data first.
 
-A `DCLabeled a` is an `a` tagged with a `DCLabel`. Reads return
-`DCLabeled` values, so the taint is visible in the type.
+# Writing Compliant Code
 
-## Current label and `unlabel`
+In general, information flows should be as isolated as possible, so that the code will not be rejected. You must make sure that the current label is not raised above the clearance, otherwise the action will be rejected. Every unlabel should be as limited in scope as possible via `toLabeled`.
 
-Your computation has a floating *current label*; read it with
-`getLabel :: DC DCLabel`. It is raised by `unlabel`:
-
-    unlabel :: DCLabeled a -> DC a
-
-`unlabel` extracts the underlying value and raises the current
-label by that value's label.
-
-## State-changing tools
-
-Writes that take a `DCLabeled` argument check three things: the
-integrity of that argument, the label of the data, and the current
-label. Maximize the integrity of the labeled argument — labeling
-with the current label (rather than constructing a fresh one)
-gives the most integrity available at that point.
-
-Writes that take plain (unlabeled) arguments unconditionally
-require current to be trusted.
-
-## `toLabeled`
-
-    toLabeled :: DCLabel -> DC a -> DC (Labeled DCLabel a)
-
-`toLabeled lbl action` quarantines `action` inside a label `lbl`
-you supply. `lbl` must be at or above the current label. The inner
-action's taint stays inside the returned `DCLabeled` value.
-
-    body <- toLabeled (secret %% untrusted) $ do
-              page <- getWebpage url
-              raw  <- unlabel page
-              pure (subagent "Summarize this." raw :: String)
-
-Generally wrap `subagent` calls in `toLabeled` — a subagent may
-read or unlabel external data and the wrap keeps that taint
-contained.
-
-## Separate via `toLabeled`
-
-Separate independent computations into their own `toLabeled` blocks
-to keep taint from spreading between them. Each block should be
-self-contained — do only the reads and unlabels for one logical
-unit so its wrap label can stay tight.
+Before you begin, identify what information flows are NECESSARY for the task. Write your code so that every other flow is isolated (via `toLabeled`). For example, if you need to apply an operation independently to all elements of a list, unlabel each one inside a `toLabeled`.
