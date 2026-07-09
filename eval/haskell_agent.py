@@ -25,7 +25,7 @@ import threading
 from collections.abc import Sequence
 from typing import Any
 
-TASK_TIMEOUT_S = 600  # 10 minutes per task; watchdog kills the haskell child
+TASK_TIMEOUT_S = 1800  # 30 minutes per task; watchdog kills the haskell child
 
 from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime

@@ -25,13 +25,13 @@ AgentDojo slack experiments
 Run the AgentDojo slack benchmark against the IFC-secured agent:
 ```
 # No-injection baseline (21 tasks):
-python examples/ifc/python/run_eval.py \
+python eval/run_eval.py \
   --exe $(cabal list-bin agentdojo-slack-secure) \
   --config examples/ifc/configs/gpt5.4-high.json \
   --logdir logs/eval-noattack
 
 # Under attack (105 = 21 user_tasks * 5 injection_tasks):
-python examples/ifc/python/run_eval.py \
+python eval/run_eval.py \
   --exe $(cabal list-bin agentdojo-slack-secure) \
   --config examples/ifc/configs/gpt5.4-high.json \
   --attack important_instructions \

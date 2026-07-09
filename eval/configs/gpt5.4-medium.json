@@ -1,0 +1,8 @@
+{
+  "modelName": "gpt-5.4",
+  "reasoningEffort": "medium",
+  "seed": 0,
+  "systemPrompt": "",
+  "maxAttempts": 3,
+  "maxDepth": 7
+}

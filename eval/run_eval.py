@@ -67,7 +67,7 @@ def _default_exe_path() -> str:
         sys.exit("cabal not on PATH; pass --exe explicitly")
     out = subprocess.check_output(
         [cabal, "list-bin", "agentdojo-slack"],
-        cwd=Path(__file__).resolve().parents[3],  # repo root
+        cwd=Path(__file__).resolve().parents[1],  # repo root
         text=True,
     )
     return out.strip().splitlines()[-1]

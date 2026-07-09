@@ -10,7 +10,7 @@ budget.
 From the repo root:
 
 ```bash
-bash camel-eval/setup.sh         # clones camel/, applies our-changes.patch
+bash eval/camel-eval/setup.sh         # clones camel/, applies our-changes.patch
 ```
 
 Then put your OpenAI key in `camel/.env` (`OPENAI_API_KEY="sk-..."`).
@@ -23,7 +23,7 @@ Dependencies are installed automatically on first `uv run`.
 **With-policy baseline + both attacks** (long: ~6–8 hours total):
 
 ```bash
-python3 camel-eval/orchestrator.py
+python3 eval/camel-eval/orchestrator.py
 ```
 
 Runs three phases sequentially against `slack`: baseline (no attack), then
@@ -36,7 +36,7 @@ security=True` so the suite resumes from cache. Final aggregate at
 **No-policy baseline** (after the with-policy run finishes):
 
 ```bash
-bash camel-eval/nopolicy-runner.sh
+bash eval/camel-eval/nopolicy-runner.sh
 ```
 
 Waits for the with-policy summary, then patches `models.py` to use
@@ -56,7 +56,7 @@ the cache doesn't collide), reruns the slack baseline, appends a row to
 
 ## What the patch changes
 
-`camel-eval/our-changes.patch` modifies upstream camel/ in three files:
+`eval/camel-eval/our-changes.patch` modifies upstream camel/ in three files:
 
 - `main.py`: adds `--attack-name` CLI flag (upstream hardcodes
   `important_instructions`).

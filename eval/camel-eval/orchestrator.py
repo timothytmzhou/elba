@@ -8,7 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 CAMEL = str(ROOT / "camel")
 LOGS = str(ROOT / "logs")
 UV = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
