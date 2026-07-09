@@ -31,9 +31,6 @@ data PseudoPrincipal
   | Public
 
 -- | The CNF of principals a PseudoPrincipal denotes.
--- Note: in this model, an agent is acting on behalf of a user, i.e. they see a user's view of Slack.
--- Therefore, every piece of data in the system already allows the user to see it.
--- Consequently, we do not represent the user in the CNF: the user essentially corresponds to cFalse.
 lookupCNF :: Map String [String] -> PseudoPrincipal -> CNF
 lookupCNF groups principal = case principal of
   ForUser (UserID u) -> toCNF u
