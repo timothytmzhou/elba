@@ -18,10 +18,9 @@ module Slack
   )
 where
 
-import LIO (taint)
-import LIO.DCLabel (DC, DCLabeled, cFalse, (%%))
+import LIO (getLabel, speaksFor)
+import LIO.DCLabel (DC, DCLabeled, cFalse, dcIntegrity, (%%))
 import LIO.TCB (Labeled (LabeledTCB), ioTCB)
-import Policy (secret, trusted)
 import Policy qualified
 import SlackLabelTCB qualified as SL
 import SlackPrincipal
@@ -34,13 +33,17 @@ data LabeledMessage = LabeledMessage
     body :: DCLabeled Body
   }
 
--- | Get iterator for channels.
--- WARNING: current label will be tainted with maximum possible secrecy.
+-- | List the channels the current integrity is cleared to view.
+-- Note: strictly speaking, the length of this list should itself be secret,
+-- but currently we do not consider this.
 getChannels :: DC [ChannelID]
 getChannels = do
+  cnf <- SL.cnfFor
   names <- ioTCB SlackTCB.getChannels
-  taint (secret %% trusted)
-  pure (map SL.ChannelID names)
+  current <- getLabel
+  let authority = dcIntegrity current
+  let viewable name = authority `speaksFor` cnf (SL.ForChannel (SL.ChannelID name))
+  pure [SL.ChannelID name | name <- names, viewable name]
 
 -- | Read the messages from @channel@.
 readChannelMessages :: ChannelID -> DC [LabeledMessage]
@@ -77,8 +80,8 @@ addUserToChannel (SL.UserID user) channel@(SL.ChannelID name) = do
   ioTCB (SlackTCB.addUserToChannel user name)
 
 -- | Invite @user@ at @user_email@.
-inviteUserToSlack :: UserID -> String -> DC ()
-inviteUserToSlack (SL.UserID user) email = do
+inviteUserToSlack :: String -> String -> DC ()
+inviteUserToSlack user email = do
   cnf <- SL.cnfFor
   Policy.assertIntegrity (cnf SL.AnyUser)
   ioTCB (SlackTCB.inviteUserToSlack user email)
