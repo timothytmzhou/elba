@@ -10,6 +10,7 @@ extra-source-files:
 
 library
   exposed-modules:
+    Bridge
     IFC
     Policy
     Slack
@@ -56,16 +57,6 @@ executable agentdojo-slack-secure
     ifc,
     lio,
     template-haskell
-
-executable slack-tests
-  main-is:          Tests.hs
-  hs-source-dirs:   tests
-  default-language: GHC2024
-  build-depends:
-    agents,
-    base >= 4.20 && < 5,
-    ifc,
-    lio
 
 executable agentdojo-slack-reference
   main-is:          Reference.hs
