@@ -1,51 +1,45 @@
 {-# LANGUAGE Trustworthy #-}
 
+-- Agent facing IFC surface. DC and DCLabeled are exported as opaque types,
+-- so interpreted code can hold and sequence them but cannot unwrap them or
+-- reach the underlying LIO monad.
 module IFC
-  ( DC,
-    -- Re-exported so the interpreter session can name the DC and DCLabeled
-    -- type synonyms once they are expanded by the required type.
-    LIO,
-    DCLabel,
-    DCLabeled,
-    Labeled,
-    LIOState (..),
-    evalLIO,
-    initialState,
-    toLabeled,
-    unlabel,
-  )
-where
+  ( DC
+  , DCLabeled
+  , unlabel
+  , toLabeled
+  ) where
 
-import LIO (LIO, LIOState (..), Label, evalLIO, getClearance, glb, setClearance, taint)
-import LIO.DCLabel (DC, DCLabel, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
-import LIO.Labeled (Labeled)
-import LIO.TCB
-  ( LIOState (lioClearance, lioLabel),
-    Labeled (LabeledTCB),
-    getLIOStateTCB,
-    putLIOStateTCB,
+import IfcTCB
+  ( DC
+  , DCLabeled
+  , Labeled (LabeledTCB)
+  , LIOState (lioLabel)
+  , cTrue
+  , dcIntegrity
+  , getClearance
+  , getStateTCB
+  , glb
+  , putStateTCB
+  , setClearance
+  , taint
+  , (%%)
   )
 
-initialState :: LIOState DCLabel
-initialState =
-  LIOState
-    { lioLabel = cTrue %% cFalse,
-      lioClearance = cFalse %% cTrue
-    }
-
--- | Runs a LIO computation without tainting the current label.
-toLabeled :: (Label l) => LIO l a -> LIO l (Labeled l a)
+-- | Run a computation without leaking its taint to the caller. The result is
+-- returned labeled with everything the computation observed.
+toLabeled :: DC a -> DC (DCLabeled a)
 toLabeled action = do
-  s0 <- getLIOStateTCB
+  s0 <- getStateTCB
   a <- action
-  s1 <- getLIOStateTCB
-  putLIOStateTCB s1 {lioLabel = lioLabel s0, lioClearance = lioClearance s0}
-  return (LabeledTCB (lioLabel s1) a)
+  s1 <- getStateTCB
+  putStateTCB s0
+  pure (LabeledTCB (lioLabel s1) a)
 
--- | Unlabels a labeled value, tainting the current label and lowering clearance.
-unlabel :: Labeled DCLabel a -> DC a
+-- | Unlabel a value, tainting the current computation with its label.
+unlabel :: DCLabeled a -> DC a
 unlabel (LabeledTCB l v) = do
   c <- getClearance
   setClearance (c `glb` (dcIntegrity l %% cTrue))
   taint l
-  return v
+  pure v

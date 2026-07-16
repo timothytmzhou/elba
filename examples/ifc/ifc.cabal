@@ -25,6 +25,7 @@ library
     -- general IFC library and bridge
     Bridge
     IFC
+    IfcTCB
     InsecureApp
     Policy
     -- AgentDojo suite bindings

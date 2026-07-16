@@ -47,7 +47,7 @@ module Travel
 
 import AgentDojoTypes (CalendarEvent, Email)
 import Data.Map (Map)
-import LIO.DCLabel (DC, DCLabeled)
+import IFC (DC, DCLabeled)
 
 type StringMap = Map String String
 

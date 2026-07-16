@@ -13,11 +13,21 @@ module Policy
   ) where
 
 import Control.Monad (unless)
-import LIO (getLabel, speaksFor)
-import LIO.DCLabel (CNF, DC, DCLabel, DCLabeled, cFalse, cTrue, dcIntegrity, toCNF, (%%))
-import LIO.Error (labelError)
-import LIO.Labeled (unlabelP)
-import LIO.TCB (Priv (PrivTCB), ioTCB)
+import IfcTCB
+  ( CNF
+  , DC
+  , DCLabel
+  , DCLabeled
+  , cFalse
+  , cTrue
+  , dcIO
+  , dcIntegrity
+  , getLabel
+  , labelError
+  , speaksFor
+  , unlabelTCB
+  , (%%)
+  )
 
 -- | Secrecy anyone may read.
 public :: CNF
@@ -34,9 +44,6 @@ trusted = cFalse
 -- | Integrity unendorsed.
 untrusted :: CNF
 untrusted = cTrue
-
-unlabelTCB :: DCLabeled a -> DC a
-unlabelTCB = unlabelP (PrivTCB (toCNF False))
 
 -- | A write requires current integrity to speak for the destination.
 assertWrite :: DCLabel -> DC ()
@@ -57,4 +64,4 @@ write :: (b -> IO c) -> DCLabel -> DCLabeled b -> DC c
 write io destLabel labeledData = do
   assertWrite destLabel
   dataValue <- unlabelTCB labeledData
-  ioTCB (io dataValue)
+  dcIO (io dataValue)

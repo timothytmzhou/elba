@@ -40,7 +40,7 @@ module Workspace
   ) where
 
 import AgentDojoTypes (CalendarEvent, CloudDriveFile, CloudFileId, Email, EmailContact)
-import LIO.DCLabel (DC, DCLabeled)
+import IFC (DC, DCLabeled)
 
 getUnreadEmails :: DC (DCLabeled [Email])
 getUnreadEmails = undefined

@@ -22,7 +22,7 @@ module Banking
   ) where
 
 import BankingTCB (StringMap, Transaction)
-import LIO.DCLabel (DC, DCLabeled)
+import IFC (DC, DCLabeled)
 
 getIban :: DC String
 getIban = undefined

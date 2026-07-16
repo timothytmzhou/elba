@@ -7,9 +7,8 @@ module Web
   )
 where
 
-import LIO.DCLabel (DC, dcPublic)
-import LIO.TCB (Labeled (LabeledTCB), ioTCB)
-import Policy (DCLabeled, assertWrite, write)
+import IfcTCB (DC, DCLabeled, Labeled (LabeledTCB), dcIO, dcPublic)
+import Policy (assertWrite, write)
 import WebTCB (Url)
 import WebTCB qualified
 
@@ -17,7 +16,7 @@ import WebTCB qualified
 getWebpage :: Url -> DC (DCLabeled String)
 getWebpage url = do
   assertWrite dcPublic
-  content <- ioTCB (WebTCB.getWebpage url)
+  content <- dcIO (WebTCB.getWebpage url)
   pure (LabeledTCB dcPublic content)
 
 -- | Post @labeledContent@ to @url@.
