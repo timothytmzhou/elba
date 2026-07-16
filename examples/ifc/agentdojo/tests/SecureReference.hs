@@ -17,7 +17,7 @@ import Data.List
   )
 import Data.Ord (Down (..), comparing)
 import IFC (DC, toLabeled, unlabel)
-import IfcTCB (evalDC, initialState)
+import IFCInternal (evalDC, initialState)
 import Slack
 import System.Environment (getArgs)
 import Web

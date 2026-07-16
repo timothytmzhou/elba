@@ -46,13 +46,9 @@ class Model:
     def load(path: str | Path) -> "Model":
         raw = json.loads(Path(path).read_text())
         return Model(
-            name=raw["name"],
-            display=raw.get("display", raw["name"]),
-            agent_config=raw["agent_config"],
-            camel_model=raw["camel_model"],
-            camel_reasoning=raw.get("camel_reasoning", False),
-            attack_model_name=raw.get("attack_model_name", "AI assistant"),
-        )
+            raw["name"], raw.get("display", raw["name"]), raw["agent_config"],
+            raw["camel_model"], raw.get("camel_reasoning", False),
+            raw.get("attack_model_name", "AI assistant"))
 
     def pipeline_name(self, system: str, variant: str) -> str:
         # CaMeL builds this name itself so the camel branch must match its

@@ -245,34 +245,23 @@ def ci_table(records, suites, models, attacks) -> str:
     return ("\n".join(lines) + "\n") if rows else "% no paired data yet\n"
 
 
-def _print_summary(records, suites, models, attacks) -> None:
-    for suite in suites:
-        printed = False
-        for system, variant in ROW_ORDER:
-            for model in models.values():
-                cells = row_cells(records, system, variant, model, suite, attacks)
-                if not cells:
-                    continue
-                if not printed:
-                    print(f"\n== {suite} ==")
-                    printed = True
-                plain = [c.replace(r"\%", "%").replace(r"$\pm$", "±") for c in cells]
-                print(f"{SYSTEM_LABELS[(system, variant)] + ' / ' + model.display:<38}"
-                      + "".join(f"{c:<26}" for c in plain))
-
-
 def process(logdir, models, suites, attacks, repeats) -> Path:
     records = load_results(logdir, models)
     outdir = logdir / "results"
     outdir.mkdir(parents=True, exist_ok=True)
-    with (outdir / "dump.jsonl").open("w") as f:
-        for r in records:
-            f.write(json.dumps(r) + "\n")
+    (outdir / "dump.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
     for suite in suites:
         if any(r["suite"] == suite for r in records):
             (outdir / f"table_{suite}.tex").write_text(suite_table(records, suite, models, attacks, repeats))
+            print(f"\n{suite}:")
+            for system, variant in ROW_ORDER:
+                for model in models.values():
+                    cells = row_cells(records, system, variant, model, suite, attacks)
+                    if cells:
+                        row = (c.replace(r"\%", "%").replace(r"$\pm$", "±") for c in cells)
+                        print(f"  {SYSTEM_LABELS[system, variant] + '/' + model.display:<36}"
+                              + "".join(f"{c:<26}" for c in row))
     (outdir / "confidence_intervals.tex").write_text(ci_table(records, suites, models, attacks))
-    _print_summary(records, suites, models, attacks)
     print(f"\nProcessed {len(records)} task evaluations into {outdir}")
     return outdir
 

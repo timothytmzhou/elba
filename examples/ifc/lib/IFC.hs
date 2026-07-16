@@ -10,33 +10,32 @@ module IFC
   , toLabeled
   ) where
 
-import IfcTCB
+import IFCInternal
   ( DC
   , DCLabeled
   , Labeled (LabeledTCB)
-  , LIOState (lioLabel)
+  , LIOState (lioClearance, lioLabel)
   , cTrue
   , dcIntegrity
   , getClearance
-  , getStateTCB
+  , getLIOStateTCB
   , glb
-  , putStateTCB
+  , putLIOStateTCB
   , setClearance
   , taint
   , (%%)
   )
 
--- | Run a computation without leaking its taint to the caller. The result is
--- returned labeled with everything the computation observed.
+-- | Runs a computation without tainting the current label.
 toLabeled :: DC a -> DC (DCLabeled a)
 toLabeled action = do
-  s0 <- getStateTCB
+  s0 <- getLIOStateTCB
   a <- action
-  s1 <- getStateTCB
-  putStateTCB s0
+  s1 <- getLIOStateTCB
+  putLIOStateTCB s1 {lioLabel = lioLabel s0, lioClearance = lioClearance s0}
   pure (LabeledTCB (lioLabel s1) a)
 
--- | Unlabel a value, tainting the current computation with its label.
+-- | Unlabels a labeled value, tainting the current label and lowering clearance.
 unlabel :: DCLabeled a -> DC a
 unlabel (LabeledTCB l v) = do
   c <- getClearance

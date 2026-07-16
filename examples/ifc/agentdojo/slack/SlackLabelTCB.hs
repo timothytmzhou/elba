@@ -14,7 +14,7 @@ where
 import Data.List (nub)
 import Data.Map (Map, (!))
 import Data.Map qualified as Map
-import IfcTCB (CNF, DC, DCLabel, cFalse, cTrue, dcIO, toCNF, (%%), (\/))
+import IFCInternal (CNF, DC, DCLabel, cFalse, cTrue, ioTCB, toCNF, (%%), (\/))
 import SlackTCB qualified
 
 -- These are exported as opaque in Slack Principal.
@@ -43,8 +43,8 @@ lookupCNF groups principal = case principal of
 -- | Internal helper to map channel names to their members.
 membership :: DC (Map String [String])
 membership = do
-  channels <- dcIO SlackTCB.getChannels
-  memberships <- dcIO (mapM withMembers channels)
+  channels <- ioTCB SlackTCB.getChannels
+  memberships <- ioTCB (mapM withMembers channels)
   pure (Map.fromList memberships)
   where
     withMembers c = do

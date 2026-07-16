@@ -12,7 +12,7 @@ where
 
 import Data.List (nub)
 import Data.Map qualified as Map
-import IfcTCB (DC, DCLabeled, Labeled (LabeledTCB), cFalse, taint, (%%))
+import IFCInternal (DC, DCLabeled, Labeled (LabeledTCB), cFalse, taint, (%%))
 import SlackLabelTCB
   ( ChannelID (..),
     PseudoPrincipal (..),

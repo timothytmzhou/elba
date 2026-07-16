@@ -13,19 +13,21 @@ module Policy
   ) where
 
 import Control.Monad (unless)
-import IfcTCB
+import IFCInternal
   ( CNF
   , DC
   , DCLabel
   , DCLabeled
+  , Priv (PrivTCB)
   , cFalse
   , cTrue
-  , dcIO
   , dcIntegrity
   , getLabel
+  , ioTCB
   , labelError
   , speaksFor
-  , unlabelTCB
+  , toCNF
+  , unlabelP
   , (%%)
   )
 
@@ -44,6 +46,9 @@ trusted = cFalse
 -- | Integrity unendorsed.
 untrusted :: CNF
 untrusted = cTrue
+
+unlabelTCB :: DCLabeled a -> DC a
+unlabelTCB = unlabelP (PrivTCB (toCNF False))
 
 -- | A write requires current integrity to speak for the destination.
 assertWrite :: DCLabel -> DC ()
@@ -64,4 +69,4 @@ write :: (b -> IO c) -> DCLabel -> DCLabeled b -> DC c
 write io destLabel labeledData = do
   assertWrite destLabel
   dataValue <- unlabelTCB labeledData
-  dcIO (io dataValue)
+  ioTCB (io dataValue)

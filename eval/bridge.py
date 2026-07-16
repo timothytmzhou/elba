@@ -1,17 +1,13 @@
 """Run one AgentDojo task through the Haskell agent binary.
 
+Invoked as a worker by the runner as python bridge.py '<atom spec json>'.
 The bridge speaks newline json with the binary.
 
     Python to Haskell.  {"prompt": ...} then {"ok": ...} or {"err": ...}
     Haskell to Python.  {"call": ..., "args": {...}} then {"done"/"failed": ...}
 
-Invoked as a worker by the runner.
-
-    python bridge.py '<atom spec json>'
-
-Each agent shells out to the llm CLI whose continue flag resumes the most
-recent conversation in a shared database, so every atom gets a private
-LLM_USER_PATH. That private dir is also where token counts are read from.
+Each atom gets a private LLM_USER_PATH so the llm CLI conversations and token
+counts stay isolated across parallel workers.
 """
 
 from __future__ import annotations

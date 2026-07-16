@@ -18,7 +18,7 @@ module Slack
   )
 where
 
-import IfcTCB (DC, DCLabeled, Labeled (LabeledTCB), cFalse, dcIO, dcIntegrity, getLabel, speaksFor, (%%))
+import IFCInternal (DC, DCLabeled, Labeled (LabeledTCB), cFalse, ioTCB, dcIntegrity, getLabel, speaksFor, (%%))
 import Policy qualified
 import SlackLabelTCB qualified as SL
 import SlackPrincipal
@@ -37,7 +37,7 @@ data LabeledMessage = LabeledMessage
 getChannels :: DC [ChannelID]
 getChannels = do
   cnf <- SL.cnfFor
-  names <- dcIO SlackTCB.getChannels
+  names <- ioTCB SlackTCB.getChannels
   current <- getLabel
   let authority = dcIntegrity current
   let viewable name = authority `speaksFor` cnf (SL.ForChannel (SL.ChannelID name))
@@ -54,20 +54,20 @@ readChannelMessages channel@(SL.ChannelID name) = do
             messageLabel = channelSecrecy %% cnf (SL.ForUser sender)
             body = LabeledTCB messageLabel (SlackTCB.body m)
          in LabeledMessage {sender, recipient, body}
-  messages <- dcIO (SlackTCB.readChannelMessages name)
+  messages <- ioTCB (SlackTCB.readChannelMessages name)
   pure (map labelMessage messages)
 
 -- | Read @user@'s inbox.
 readInbox :: UserID -> DC (DCLabeled [Body])
 readInbox user@(SL.UserID name) = do
   l <- SL.labelFor (SL.ForUser user)
-  messages <- dcIO (SlackTCB.readInbox name)
+  messages <- ioTCB (SlackTCB.readInbox name)
   pure (LabeledTCB l (map SlackTCB.body messages))
 
 -- | List the users in @channel@.
 getUsersInChannel :: ChannelID -> DC [UserID]
 getUsersInChannel (SL.ChannelID name) = do
-  users <- dcIO (SlackTCB.getUsersInChannel name)
+  users <- ioTCB (SlackTCB.getUsersInChannel name)
   pure (map SL.UserID users)
 
 -- | Add @user@ to @channel@.
@@ -75,20 +75,20 @@ addUserToChannel :: UserID -> ChannelID -> DC ()
 addUserToChannel (SL.UserID user) channel@(SL.ChannelID name) = do
   cnf <- SL.cnfFor
   Policy.assertIntegrity (cnf (SL.ForChannel channel))
-  dcIO (SlackTCB.addUserToChannel user name)
+  ioTCB (SlackTCB.addUserToChannel user name)
 
 -- | Invite @user@ at @user_email@.
 inviteUserToSlack :: String -> String -> DC ()
 inviteUserToSlack user email = do
   cnf <- SL.cnfFor
   Policy.assertIntegrity (cnf SL.AnyUser)
-  dcIO (SlackTCB.inviteUserToSlack user email)
+  ioTCB (SlackTCB.inviteUserToSlack user email)
 
 -- | Remove @user@.
 removeUserFromSlack :: UserID -> DC ()
 removeUserFromSlack (SL.UserID user) = do
   Policy.assertIntegrity cFalse
-  dcIO (SlackTCB.removeUserFromSlack user)
+  ioTCB (SlackTCB.removeUserFromSlack user)
 
 -- | Send a DM with @labeledBody@ to @recipient@.
 sendDirectMessage :: UserID -> DCLabeled Body -> DC ()
