@@ -1,5 +1,6 @@
 module Main where
 
+import AgentApp (initialState)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (when, zipWithM_)
@@ -16,7 +17,8 @@ import Data.List
     (\\),
   )
 import Data.Ord (Down (..), comparing)
-import IFC (DC, evalLIO, initialState, toLabeled, unlabel)
+import IFC (DC, toLabeled, unlabel)
+import LIO (evalLIO)
 import Slack
 import System.Environment (getArgs)
 import Web

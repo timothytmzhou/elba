@@ -31,7 +31,10 @@ data Env = Env
     modules :: [ModuleName],
     silentModules :: [ModuleName],
     extensions :: [Extension],
-    toolDocs :: Map String String
+    toolDocs :: Map String String,
+    -- | Textual substitutions applied to types shown to the model, so a
+    -- prompt can respect an alias that TypeRep rendering expands.
+    typeAliases :: [(String, String)]
   }
 
 defEnv :: Env
@@ -42,7 +45,8 @@ defEnv =
       modules = [],
       silentModules = [],
       extensions = [],
-      toolDocs = Map.empty
+      toolDocs = Map.empty,
+      typeAliases = []
     }
 
 -- TypeEnv: name -> (signature, optional docstring). Show formats each entry

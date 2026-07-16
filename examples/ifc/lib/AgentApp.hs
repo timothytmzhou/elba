@@ -7,6 +7,7 @@
 module AgentApp
   ( runInsecureAgent
   , runSecureAgent
+  , initialState
   ) where
 
 import Agents (mkAgent)
@@ -15,12 +16,17 @@ import Control.Exception (SomeException, displayException, try)
 import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
-import Env (Env)
-import IFC (DC, evalLIO, initialState)
+import Env (Env (..))
+import IFC (DC)
+import LIO (LIOState (..), evalLIO)
+import LIO.DCLabel (DCLabel, cFalse, cTrue, (%%))
 import LLM (Config (..), defaultConfig)
 import System.Environment (getArgs)
 
 $(deriveFromJSON defaultOptions ''Config)
+
+initialState :: LIOState DCLabel
+initialState = LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
 parseFlag :: String -> [String] -> Maybe FilePath
 parseFlag flag (a : v : _) | a == flag = Just v
@@ -50,7 +56,11 @@ runInsecureAgent :: Env -> IO ()
 runInsecureAgent env = runAgentWith (\cfg prompt -> mkAgent cfg env prompt) id
 
 -- | Runs the agent in the DC monad. The tweak lets a suite extend the
--- config, for example appending IFC guidance to the system prompt.
+-- config, for example appending IFC guidance to the system prompt. The
+-- alias keeps the prompt's required type spelled DC even though TypeRep
+-- rendering expands the synonym.
 runSecureAgent :: Env -> (Config -> Config) -> IO ()
-runSecureAgent env =
-  runAgentWith (\cfg prompt -> evalLIO (mkAgent cfg env prompt :: DC String) initialState)
+runSecureAgent env = runAgentWith run
+  where
+    run cfg prompt = evalLIO (mkAgent cfg aliased prompt :: DC String) initialState
+    aliased = env {typeAliases = [("LIO DCLabel", "DC")]}

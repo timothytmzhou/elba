@@ -112,4 +112,5 @@ executable agentdojo-slack-secure-reference
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    ifc
+    ifc,
+    lio

@@ -6,6 +6,7 @@ module Agents
   ) where
 
 import Control.Monad.Catch (try)
+import Data.List (isPrefixOf)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
 import Env
@@ -16,14 +17,27 @@ import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
 
-buildContext :: forall a. (Typeable a) => Proxy a -> TypeEnv -> String -> String
-buildContext proxy typeEnv task =
+buildContext :: forall a. (Typeable a) => Proxy a -> [(String, String)] -> TypeEnv -> String -> String
+buildContext proxy aliases typeEnv task =
   unlines
     [ task
     , ""
-    , "Required type: " ++ show (typeRep proxy)
+    , "Required type: " ++ applyAliases aliases (show (typeRep proxy))
     , "Allowed functions: " ++ show typeEnv
     ]
+
+-- | Rewrites each alias source string to its target. Types rendered from
+-- TypeRep arrive with synonyms expanded, this restores the alias the
+-- model is meant to see.
+applyAliases :: [(String, String)] -> String -> String
+applyAliases aliases s0 = foldl (flip sub) s0 aliases
+  where
+    sub (from, to) = go
+      where
+        go [] = []
+        go s@(c : cs)
+          | from `isPrefixOf` s = to ++ go (drop (length from) s)
+          | otherwise = c : go cs
 
 retryMessage :: String -> String
 retryMessage errStr =
@@ -66,7 +80,7 @@ mkAgent config env userPrompt = unsafePerformIO $
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
       typeEnv <- setEnv env baseModules
-      let ctx = buildContext (Proxy :: Proxy a) typeEnv userPrompt
+      let ctx = buildContext (Proxy :: Proxy a) (typeAliases env) typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
       liftIO (logEvent lg (Response code))
@@ -76,7 +90,7 @@ mkAgent config env userPrompt = unsafePerformIO $
       Right f -> pure (f config env)
   where
     baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
-    requiredType = show (typeRep (Proxy :: Proxy a))
+    requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
 
     runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
     runAttempt lg ask code attempt = do
@@ -85,7 +99,7 @@ mkAgent config env userPrompt = unsafePerformIO $
         Right f -> do
           liftIO (logEvent lg Success)
           pure f
-        Left err -> handleFailure lg ask (formatErr err) attempt
+        Left err -> handleFailure lg ask (applyAliases (typeAliases env) (formatErr err)) attempt
 
     handleFailure :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
     handleFailure lg ask errStr attempt
