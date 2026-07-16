@@ -22,7 +22,6 @@ library
     AgentApp
     Bridge
     IFC
-    IFCInternal
     Policy
     -- AgentDojo suite bindings
     AgentDojoTypes

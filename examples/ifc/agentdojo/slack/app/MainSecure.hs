@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC secured agent app for the slack suite. Opaque types stay out of the
--- tool list. addTools would leak their constructors and their defining
--- modules are unsafe to import. The agent still sees them in the tool
--- signatures, with DC and DCLabeled in scope through the silent IFC import.
+-- IFC secured agent app for the slack suite. ChannelID and UserID stay out
+-- of the tool list because addTools would leak their constructors and their
+-- defining module is unsafe to import. The agent still sees them in the
+-- tool signatures.
 module Main where
 
 import AgentApp (runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (toLabeled, unlabel)
+import IFC (DC, DCLabeled, toLabeled, unlabel)
 import LLM (Config (..), defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
@@ -23,7 +23,12 @@ agentEnv :: Env
 agentEnv =
   $( addTools
        [ -- Slack types
-         ''LabeledMessage
+         ''Body
+       , ''LabeledMessage
+       , ''DC
+       , ''DCLabeled
+         -- Web type
+       , ''Url
          -- Slack ids
        , 'channelName
        , 'userName

@@ -14,7 +14,8 @@ where
 import Data.List (nub)
 import Data.Map (Map, (!))
 import Data.Map qualified as Map
-import IFCInternal (CNF, DC, DCLabel, cFalse, cTrue, ioTCB, toCNF, (%%), (\/))
+import LIO.DCLabel (CNF, DC, DCLabel, cFalse, cTrue, toCNF, (%%), (\/))
+import LIO.TCB (ioTCB)
 import SlackTCB qualified
 
 -- These are exported as opaque in Slack Principal.

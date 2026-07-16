@@ -16,8 +16,7 @@ import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
 import Env (Env)
-import IFC (DC)
-import IFCInternal (evalDC, initialState)
+import IFC (DC, evalLIO, initialState)
 import LLM (Config (..), defaultConfig)
 import System.Environment (getArgs)
 
@@ -54,4 +53,4 @@ runInsecureAgent env = runAgentWith (\cfg prompt -> mkAgent cfg env prompt) id
 -- config, for example appending IFC guidance to the system prompt.
 runSecureAgent :: Env -> (Config -> Config) -> IO ()
 runSecureAgent env =
-  runAgentWith (\cfg prompt -> evalDC (mkAgent cfg env prompt :: DC String) initialState)
+  runAgentWith (\cfg prompt -> evalLIO (mkAgent cfg env prompt :: DC String) initialState)

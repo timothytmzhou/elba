@@ -7,8 +7,9 @@ module Web
   )
 where
 
-import IFCInternal (DC, DCLabeled, Labeled (LabeledTCB), dcPublic, ioTCB)
-import Policy (assertWrite, write)
+import LIO.DCLabel (DC, dcPublic)
+import LIO.TCB (Labeled (LabeledTCB), ioTCB)
+import Policy (DCLabeled, assertWrite, write)
 import WebTCB (Url)
 import WebTCB qualified
 

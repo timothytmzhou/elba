@@ -13,23 +13,11 @@ module Policy
   ) where
 
 import Control.Monad (unless)
-import IFCInternal
-  ( CNF
-  , DC
-  , DCLabel
-  , DCLabeled
-  , Priv (PrivTCB)
-  , cFalse
-  , cTrue
-  , dcIntegrity
-  , getLabel
-  , ioTCB
-  , labelError
-  , speaksFor
-  , toCNF
-  , unlabelP
-  , (%%)
-  )
+import LIO (getLabel, speaksFor)
+import LIO.DCLabel (CNF, DC, DCLabel, DCLabeled, cFalse, cTrue, dcIntegrity, toCNF, (%%))
+import LIO.Error (labelError)
+import LIO.Labeled (unlabelP)
+import LIO.TCB (Priv (PrivTCB), ioTCB)
 
 -- | Secrecy anyone may read.
 public :: CNF

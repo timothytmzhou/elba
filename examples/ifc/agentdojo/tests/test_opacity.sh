@@ -1,7 +1,10 @@
 #!/bin/bash
-# Confirms the interpreted agent cannot reference IFC internals. Each snippet
-# is fed to the secure slack binary as the model output. Snippets that touch
-# internals must be rejected by the typechecker. A benign snippet must run.
+# Confirms the interpreted agent cannot reach IFC internals. Opacity follows
+# lio's model. Naming types like LIO and DCLabel is fine, but the LIOTCB
+# constructor and the TCB primitives live in unsafe modules the interpreter
+# cannot import, so snippets touching them must be rejected by the
+# typechecker. Each snippet is fed to the secure slack binary as the model
+# output. A benign snippet must run.
 #
 # Usage. cabal build agentdojo-slack-secure, then bash test_opacity.sh
 
@@ -31,10 +34,10 @@ echo '$2'")
 }
 
 reject "call ioTCB"          'ioTCB (return ()) >> return "x"'
-reject "name LIO monad"      'return "x" :: LIO DCLabel String'
-reject "unwrap DC ctor"      'case getChannels of { DC m -> return "x" }'
-reject "name DCLabel"        'return (undefined :: DCLabel) >> return "x"'
+reject "unwrap LIOTCB ctor"  'case getChannels of { LIOTCB m -> return "x" }'
 reject "call unlabelTCB"     'unlabelTCB undefined'
+reject "call lio setLabel"   'setLabel undefined >> return "x"'
+accept "name LIO in a type"  'return "x" :: LIO DCLabel String'
 accept "benign"              'return "done"'
 accept "real tool"           'do { _ <- getChannels; return "ok" }'
 
