@@ -1,37 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Insecure tool surface for AgentDojo's @banking@ suite (transactions,
--- balance, scheduled payments, user account, a file reader). This is the
--- no-policy surface used by @agentdojo-banking@; the IFC-secured surface is
--- left to be written by hand (see banking/policy/Policy.hs).
-module BankingTCB
-  ( Transaction (..)
-  , StringMap
-  , getIban
-  , sendMoney
-  , scheduleTransaction
-  , updateScheduledTransaction
-  , getBalance
-  , getMostRecentTransactions
-  , getScheduledTransactions
-  , readFile_
-  , getUserInfo
-  , updatePassword
-  , updateUserInfo
-  ) where
+-- Insecure tool surface for the banking suite.
+module BankingTCB (module BankingTCB) where
 
-import Bridge (callPy)
-import Data.Aeson
-  ( FromJSON (parseJSON)
-  , ToJSON (toJSON)
-  , object
-  , withObject
-  , (.:)
-  , (.=)
-  )
+import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
 import Data.Map (Map)
+import Tool (defTool, defTools)
 
 type StringMap = Map String String
 
@@ -69,82 +46,16 @@ instance ToJSON Transaction where
       , "recurring" .= txRecurring
       ]
 
--- | IBAN of the current account.
-getIban :: IO String
-getIban = callPy "get_iban" (object [])
-
--- | Send money. @recipient@: IBAN. @date@: "YYYY-MM-DD".
-sendMoney :: String -> Double -> String -> String -> IO StringMap
-sendMoney recipient amount subject date =
-  callPy
-    "send_money"
-    (object ["recipient" .= recipient, "amount" .= amount, "subject" .= subject, "date" .= date])
-
--- | Schedule a (possibly recurring) transaction.
-scheduleTransaction :: String -> Double -> String -> String -> Bool -> IO StringMap
-scheduleTransaction recipient amount subject date recurring =
-  callPy
-    "schedule_transaction"
-    ( object
-        [ "recipient" .= recipient
-        , "amount" .= amount
-        , "subject" .= subject
-        , "date" .= date
-        , "recurring" .= recurring
-        ]
-    )
-
--- | Update a scheduled transaction by id. Fields left @Nothing@ are
--- unchanged.
-updateScheduledTransaction
-  :: Int -> Maybe String -> Maybe Double -> Maybe String -> Maybe String -> Maybe Bool -> IO StringMap
-updateScheduledTransaction tid recipient amount subject date recurring =
-  callPy
-    "update_scheduled_transaction"
-    ( object
-        [ "id" .= tid
-        , "recipient" .= recipient
-        , "amount" .= amount
-        , "subject" .= subject
-        , "date" .= date
-        , "recurring" .= recurring
-        ]
-    )
-
--- | Current account balance.
-getBalance :: IO Double
-getBalance = callPy "get_balance" (object [])
-
--- | The @n@ most recent transactions.
-getMostRecentTransactions :: Int -> IO [Transaction]
-getMostRecentTransactions n = callPy "get_most_recent_transactions" (object ["n" .= n])
-
--- | The list of scheduled transactions.
-getScheduledTransactions :: IO [Transaction]
-getScheduledTransactions = callPy "get_scheduled_transactions" (object [])
-
--- | Read a file from the account's filesystem (suffixed @_@ to avoid the
--- Prelude clash).
-readFile_ :: String -> IO String
-readFile_ path = callPy "read_file" (object ["file_path" .= path])
-
--- | The user account information (name, address).
-getUserInfo :: IO StringMap
-getUserInfo = callPy "get_user_info" (object [])
-
--- | Update the account password.
-updatePassword :: String -> IO StringMap
-updatePassword password = callPy "update_password" (object ["password" .= password])
-
--- | Update user account fields. Fields left @Nothing@ are unchanged.
-updateUserInfo :: Maybe String -> Maybe String -> Maybe String -> Maybe String -> IO StringMap
-updateUserInfo firstName lastName street city =
-  callPy
-    "update_user_info"
-    ( object
-        [ "first_name" .= firstName
-        , "last_name" .= lastName
-        , "street" .= street
-        , "city" .= city
-        ]
-    )
+defTools
+  [ defTool "getIban" "get_iban" [] [t|IO String|]
+  , defTool "sendMoney" "send_money" ["recipient", "amount", "subject", "date"] [t|String -> Double -> String -> String -> IO StringMap|]
+  , defTool "scheduleTransaction" "schedule_transaction" ["recipient", "amount", "subject", "date", "recurring"] [t|String -> Double -> String -> String -> Bool -> IO StringMap|]
+  , defTool "updateScheduledTransaction" "update_scheduled_transaction" ["id", "recipient", "amount", "subject", "date", "recurring"] [t|Int -> Maybe String -> Maybe Double -> Maybe String -> Maybe String -> Maybe Bool -> IO StringMap|]
+  , defTool "getBalance" "get_balance" [] [t|IO Double|]
+  , defTool "getMostRecentTransactions" "get_most_recent_transactions" ["n"] [t|Int -> IO [Transaction]|]
+  , defTool "getScheduledTransactions" "get_scheduled_transactions" [] [t|IO [Transaction]|]
+  , defTool "readFile_" "read_file" ["file_path"] [t|String -> IO String|]
+  , defTool "getUserInfo" "get_user_info" [] [t|IO StringMap|]
+  , defTool "updatePassword" "update_password" ["password"] [t|String -> IO StringMap|]
+  , defTool "updateUserInfo" "update_user_info" ["first_name", "last_name", "street", "city"] [t|Maybe String -> Maybe String -> Maybe String -> Maybe String -> IO StringMap|]
+  ]

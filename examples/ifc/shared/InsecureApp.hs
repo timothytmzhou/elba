@@ -2,14 +2,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | Shared entry point for the no-policy (insecure) agent executables.
--- Every @agentdojo-<suite>@ binary is the same driver over a different
--- tool 'Env': parse @--config@/@--log-path@, read the prompt off the
--- bridge, run the agent in 'IO', and report the result. The IFC-secured
--- executables have their own drivers because they run in the 'DC' monad.
---
--- The orphan @FromJSON Config@ lives here (once, library-wide) so that
--- every executable shares it.
+-- Shared driver for the no policy agent executables. Each one runs the
+-- same loop over a different tool Env. The secure executables have their
+-- own driver because they run in the DC monad. The orphan FromJSON Config
+-- lives here so every executable shares one copy.
 module InsecureApp
   ( runInsecureAgent
   , loadConfig
@@ -40,7 +36,6 @@ loadConfig path = do
     Right cfg -> pure cfg
     Left err -> error ("config decode failed: " ++ err)
 
--- | Run the no-policy agent over the given tool environment.
 runInsecureAgent :: Env -> IO ()
 runInsecureAgent agentEnv = do
   args <- getArgs

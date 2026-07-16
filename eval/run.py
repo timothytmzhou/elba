@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """Run the full AgentDojo evaluation and produce the paper outputs.
 
-One command does everything — prints the plan (task counts + cost estimate
-from OpenAI's published pricing), runs every remaining task evaluation in
-parallel (TypeGuard and CaMeL, with and without policies, benign and under
-attack), then processes results into the raw data dump and the LaTeX tables:
-
     python eval/run.py --models eval/configs/*.json
 
-Execution is resumable: finished task evaluations are skipped, so rerunning
-the same command continues where it left off. Running and processing are
-separate modules (execute.py / process.py); `--plan-only` stops after the
-plan, `--process-only` skips straight to processing existing results.
+Prints the plan, runs every remaining task evaluation in parallel, then
+processes results into the raw dump and the LaTeX tables. Resumable.
+Execution and processing are separate modules. See eval/README.md.
 """
 
 from __future__ import annotations
@@ -35,27 +29,21 @@ def main() -> int:
     ap.add_argument("--models", nargs="+", required=True,
                     help="model config JSONs (eval/configs/*.json)")
     ap.add_argument("--logdir", default="logs/eval")
-    ap.add_argument("--suites", default=",".join(SUITES),
-                    help=f"comma list (default: {','.join(SUITES)})")
+    ap.add_argument("--suites", default=",".join(SUITES), help="comma list")
     ap.add_argument("--attacks", default=",".join(ATTACKS),
-                    help="comma list; '' runs only the no-attack baseline")
+                    help="comma list. empty runs only the benign baseline")
     ap.add_argument("--systems", default="typeguard,camel")
-    ap.add_argument("--repeats", type=int, default=1,
-                    help="repetitions per task (k); default 1 = pass@1")
+    ap.add_argument("--repeats", type=int, default=1, help="repetitions per task")
     ap.add_argument("--max-workers", type=int, default=None,
-                    help="parallel task evaluations; default ceil(n/4) so the "
-                         "whole run takes about 4 sequential task-times")
+                    help="parallel workers. default ceil(n/4)")
     ap.add_argument("--timeout", type=int, default=TASK_TIMEOUT_S,
-                    help="per-task budget in seconds (default 600, as in the paper)")
+                    help="per task budget in seconds")
     ap.add_argument("--benchmark-version", default=BENCHMARK_VERSION)
-    ap.add_argument("--plan-only", action="store_true",
-                    help="print the plan and exit without running")
-    ap.add_argument("--process-only", action="store_true",
-                    help="skip execution; regenerate outputs from existing results")
-    ap.add_argument("--yes", "-y", action="store_true",
-                    help="skip the confirmation prompt")
+    ap.add_argument("--plan-only", action="store_true")
+    ap.add_argument("--process-only", action="store_true")
+    ap.add_argument("--yes", "-y", action="store_true")
     ap.add_argument("--no-build", action="store_true",
-                    help="don't `cabal build` before resolving agent binaries")
+                    help="skip cabal build before locating binaries")
     args = ap.parse_args()
 
     models = {m.name: m for m in map(Model.load, args.models)}

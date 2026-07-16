@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-"""Scripted stand-in for the Haskell agent binary — lets the whole eval
-pipeline (bridge, workers, parallel runner, processing) be tested without
-LLM calls. Speaks the same line-JSON bridge protocol and takes the same
-flags; the `--config` file supplies the script:
+"""Scripted stand in for the Haskell agent binary for tests without LLM calls.
+
+Speaks the bridge protocol and reads its actions from the --config file.
 
     {"actions": [{"call": "get_webpage", "args": {"url": "..."}},
                  {"sleep": 2},
                  {"done": "final answer"}]}
-
-Tool errors are recorded and the script proceeds, so error paths can be
-probed. Without an explicit done/failed, a default done is sent.
 """
 
 import json

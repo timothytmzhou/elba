@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC-secured agent app for the travel suite. NOTE: the Travel policy
--- module is not implemented yet (every tool is `undefined`), so this
--- executable builds but fails at run time on the first tool call.
+-- IFC secured agent app for the travel suite. The Travel policy is
+-- undefined so this builds but fails at run time on the first tool call.
 module Main where
 
 import Agents (mkAgent)

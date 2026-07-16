@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Insecure (no-policy) agent app for the travel suite.
+-- No policy agent app for the travel suite. The driver lives in InsecureApp.
 module Main where
 
 import Env (Env (..), defEnv)

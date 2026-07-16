@@ -27,7 +27,8 @@ library
     Bridge
     IFC
     InsecureApp
-    -- slack: worked IFC policy + secured surface
+    Tool
+    -- slack. worked IFC policy and secured surface
     Policy
     Slack
     SlackLabelTCB
@@ -35,8 +36,7 @@ library
     SlackTCB
     Web
     WebTCB
-    -- other suites: insecure tool surfaces + policy placeholders
-    -- (the secure modules are `undefined`, to be written by hand)
+    -- other suites. insecure surfaces plus undefined policy placeholders
     WorkspaceTCB
     Workspace
     TravelTCB

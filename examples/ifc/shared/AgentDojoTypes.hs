@@ -1,16 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Haskell mirrors of the pydantic record types AgentDojo's
--- workspace/travel/banking suites return over the JSON bridge. Field
--- names follow the JSON keys produced by @model_dump(mode="json")@ (see
--- eval/evalkit/bridge.py). Parsers are deliberately lenient: optional
--- fields default rather than fail, so schema drift in unused fields does
--- not break a run.
---
--- These are the /insecure/ read types shared by more than one suite
--- (email + calendar appear in both workspace and travel). Suite-specific
--- types live in each suite's TCB module.
+-- Haskell mirrors of the pydantic records the workspace, travel, and
+-- banking suites return over the bridge. Parsers default missing fields
+-- rather than fail so unused fields never break a run.
 module AgentDojoTypes
   ( EmailId (..)
   , Email (..)
@@ -23,15 +16,14 @@ module AgentDojoTypes
 import Data.Aeson
   ( FromJSON (parseJSON)
   , ToJSON (toJSON)
-  , withObject
   , object
+  , withObject
+  , (.!=)
   , (.:)
   , (.:?)
-  , (.!=)
   , (.=)
   )
 
--- | Opaque email id (a stringly id in AgentDojo, e.g. "0").
 newtype EmailId = EmailId String
   deriving (Eq, Ord, Show)
 

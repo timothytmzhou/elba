@@ -1,13 +1,10 @@
-"""Run ONE CaMeL task evaluation. Counterpart of execute.worker_main, but
-executed inside the CaMeL checkout's environment (its pinned agentdojo):
+"""Run one CaMeL task evaluation inside the CaMeL checkout environment.
 
     uv run --project camel --env-file camel/.env \
         python eval/camel-eval/camel_worker.py '<atom json>'
 
-Builds the pipeline with CaMeL's make_tools_pipeline — patched (see
-our-changes.patch) to support no_policy — and writes the result in the
-standard AgentDojo layout under the atom's logdir, so process.py treats
-CaMeL and TypeGuard results uniformly.
+Builds the pipeline with CaMeL's patched make_tools_pipeline and writes the
+result in the standard AgentDojo layout.
 """
 
 from __future__ import annotations

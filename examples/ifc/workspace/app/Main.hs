@@ -1,7 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Insecure (no-policy) agent app for the workspace suite. The shared
--- driver lives in 'InsecureApp'; this module only fixes the tool set.
+-- No policy agent app for the workspace suite. The driver lives in InsecureApp.
 module Main where
 
 import Env (Env (..), defEnv)

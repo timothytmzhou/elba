@@ -1,16 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 
--- | IFC-secured surface for the workspace suite. THE POLICY IS NOT
--- WRITTEN YET: every binding below is 'undefined', to be implemented by
--- hand following the slack suite as the worked reference (Slack.hs,
--- SlackPrincipal.hs, SlackLabelTCB.hs, policy/Policy.hs): define the
--- principals (mailbox owner, event participants, file collaborators),
--- label each read, and gate each write on the current label.
---
--- The signatures are PROVISIONAL — where the labels sit is itself part of
--- the policy design; adjust freely when implementing. The insecure
--- executable (agentdojo-workspace) only uses WorkspaceTCB and does not
--- depend on this module's implementation.
+-- IFC secured surface for the workspace suite. The policy is not written
+-- yet. Every binding is undefined and the signatures are provisional.
+-- Follow the slack suite as the worked reference.
 module Workspace
   ( DC
   , DCLabeled

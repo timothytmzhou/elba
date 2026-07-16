@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC-secured agent app for the banking suite. NOTE: the Banking policy
--- module is not implemented yet (every tool is `undefined`), so this
--- executable builds but fails at run time on the first tool call.
+-- IFC secured agent app for the banking suite. The Banking policy is
+-- undefined so this builds but fails at run time on the first tool call.
 module Main where
 
 import Agents (mkAgent)

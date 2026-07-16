@@ -1,27 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 
--- Internal API for interfacing with the web.
+-- Insecure tool surface for the web.
+module WebTCB (module WebTCB) where
 
-module WebTCB
-  ( Url,
-    getWebpage,
-    postWebpage,
-  )
-where
-
-import Bridge (callPy)
-import Data.Aeson (object, (.=))
+import Tool (defTool, defTools)
 
 type Url = String
 
--- | Returns the content of the webpage at a given URL.
--- @url@: The URL of the webpage.
-getWebpage :: Url -> IO String
-getWebpage u = callPy "get_webpage" (object ["url" .= u])
-
--- | Posts a webpage at a given URL with the given content.
--- @url@: The URL of the webpage.
--- @content@: The content of the webpage.
-postWebpage :: Url -> String -> IO ()
-postWebpage u content = callPy "post_webpage" (object ["url" .= u, "content" .= content])
+defTools
+  [ defTool "getWebpage" "get_webpage" ["url"] [t|Url -> IO String|]
+  , defTool "postWebpage" "post_webpage" ["url", "content"] [t|Url -> String -> IO ()|]
+  ]

@@ -1,10 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 
--- | IFC-secured surface for the travel suite. THE POLICY IS NOT WRITTEN
--- YET: every binding below is 'undefined', to be implemented by hand
--- following the slack suite as the worked reference. Signatures are
--- PROVISIONAL — where the labels sit is part of the policy design.
--- The insecure executable (agentdojo-travel) only uses TravelTCB.
+-- IFC secured surface for the travel suite. The policy is not written yet.
+-- Every binding is undefined and the signatures are provisional. Follow
+-- the slack suite as the worked reference.
 module Travel
   ( DC
   , DCLabeled

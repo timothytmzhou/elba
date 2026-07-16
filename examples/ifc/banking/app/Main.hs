@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- Insecure (no-policy) agent app for the banking suite.
+-- No policy agent app for the banking suite. The driver lives in InsecureApp.
 module Main where
 
 import BankingTCB
