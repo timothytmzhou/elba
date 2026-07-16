@@ -14,8 +14,6 @@ import Language.Haskell.TH.Syntax (Extension (..))
 data Env = Env
   { modules :: [ModuleName],
     functions :: [(ModuleName, String)],
-    -- | In scope like Prelude but not shown as tools.
-    ambient :: [ModuleName],
     extensions :: [Extension],
     -- | Textual substitutions applied to types shown to the model, so a
     -- prompt can respect an alias that TypeRep rendering expands.
@@ -27,7 +25,6 @@ defEnv =
   Env
     { modules = [],
       functions = [],
-      ambient = ["Control.Monad", "Data.Char", "Data.List", "Data.Ord"],
       extensions = [],
       typeAliases = []
     }

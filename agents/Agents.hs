@@ -43,7 +43,7 @@ instance Show TypeEnv where
 setEnv :: Env -> [ResolvedTool] -> [ModuleName] -> Interpreter TypeEnv
 setEnv env tools baseModules = do
   setImportsF $
-    [ModuleImport m NotQualified NoImportList | m <- modules env ++ ambient env ++ baseModules]
+    [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
       ++ [ ModuleImport m NotQualified (ImportList [parenIfOp n])
          | (m, n) <- functions env
          ]
@@ -130,7 +130,30 @@ mkAgent config env userPrompt = unsafePerformIO $
       Left interpErr -> error (show interpErr)
       Right f -> pure (f config env)
   where
-    baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
+    -- The agent's ambient language. Pure standard base modules are fine to
+    -- expose because agent code is typechecked, the limit is name clashes.
+    baseModules =
+      [ "Prelude"
+      , "Control.Applicative"
+      , "Control.Monad"
+      , "Data.Bifunctor"
+      , "Data.Char"
+      , "Data.Either"
+      , "Data.Foldable"
+      , "Data.Function"
+      , "Data.Functor"
+      , "Data.List"
+      , "Data.Maybe"
+      , "Data.Ord"
+      , "Data.Traversable"
+      , "Data.Tuple"
+      , "Text.Read"
+      , -- plumbing the subagent wrapper needs
+        "LLM"
+      , "Agents"
+      , "Data.Typeable"
+      , "Language.Haskell.TH.Syntax"
+      ]
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
     -- The interpreter checks against the aliased spelling, so only the
     -- alias targets need to be in scope, not their expansions.
