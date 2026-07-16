@@ -1,12 +1,12 @@
 {
-  "name": "o4-mini-high",
-  "display": "o4-mini (high)",
+  "name": "o4-mini-medium",
+  "display": "o4-mini (medium)",
   "camel_model": "openai:o4-mini-2025-04-16",
   "camel_reasoning": true,
   "attack_model_name": "AI assistant",
   "agent_config": {
     "modelName": "o4-mini",
-    "reasoningEffort": "high",
+    "reasoningEffort": "medium",
     "seed": 0,
     "systemPrompt": "",
     "maxAttempts": 3,

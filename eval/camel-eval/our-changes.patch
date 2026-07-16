@@ -1,16 +1,17 @@
 diff --git a/main.py b/main.py
-index b677afa..0854ae8 100644
+index b677afa..c740d6f 100644
 --- a/main.py
 +++ b/main.py
-@@ -36,6 +36,7 @@ def main(
+@@ -36,6 +36,8 @@ def main(
      eval_mode: MetadataEvalMode = MetadataEvalMode.NORMAL,
      q_llm: str | None = None,
      user_tasks: list[str] | None = None,
 +    attack_name: str = "important_instructions",
++    no_policy: bool = False,
  ):
      """Example usage of the defense.
  
-@@ -57,8 +58,6 @@ def main(
+@@ -57,8 +59,6 @@ def main(
          q_llm: what model to use as a quarantined llm. If None, the same as `model` is used.
      """
  
@@ -19,48 +20,104 @@ index b677afa..0854ae8 100644
      suites = suites or ["workspace", "banking", "travel", "slack"]
      total_utility_results = []
      total_security_results = []
+@@ -75,6 +75,7 @@ def main(
+             ad_defense,
+             eval_mode,
+             q_llm,  # type: ignore
++            no_policy=no_policy,
+         )
+         suite = get_suite("v1.2", suite_name)
+         attack = attacks.load_attack(attack_name, suite, tools_pipeline)
 diff --git a/src/camel/models.py b/src/camel/models.py
-index 7ebce22..f03389a 100644
+index 7ebce22..31b0b8c 100644
 --- a/src/camel/models.py
 +++ b/src/camel/models.py
-@@ -15,7 +15,6 @@ from camel.pipeline_elements.anthropic_tool_filter import AnthropicLLMToolFilter
- from camel.pipeline_elements.privileged_llm import PrivilegedLLM
- from camel.pipeline_elements.replay_privileged_llm import PrivilegedLLMReplayer, UserInjectionTasksGetter
- from camel.pipeline_elements.security_policies import (
--    ADNoSecurityPolicyEngine,
-     AgentDojoSecurityPolicyEngine,
-     BankingSecurityPolicyEngine,
-     SlackSecurityPolicyEngine,
-@@ -30,6 +29,7 @@ _oai_thinking_models = {
+@@ -30,7 +30,28 @@ _oai_thinking_models = {
      "o3-mini-2025-01-31": "ChatGPT",
      "o1-2024-12-17": "ChatGPT",
      "codex-mini-latest": "ChatGPT",
 +    "gpt-5.4-2026-03-05": "ChatGPT",
  }
++
++
++def _extra_models_from_env(var: str) -> dict[str, str]:
++    """Register additional models without patching this file again.
++
++    The variable holds a comma-separated list of `model_id` or
++    `model_id=Display Name` entries (display name defaults to "ChatGPT").
++    Example: CAMEL_EXTRA_REASONING_MODELS="gpt-6-2026-12-01=ChatGPT".
++    """
++    entries = {}
++    for item in os.environ.get(var, "").split(","):
++        item = item.strip()
++        if not item:
++            continue
++        model_id, _, display = item.partition("=")
++        entries[model_id.strip()] = display.strip() or "ChatGPT"
++    return entries
++
++
++_oai_thinking_models |= _extra_models_from_env("CAMEL_EXTRA_REASONING_MODELS")
  _oai_thinking_models_with_effort = {
      f"{model}-{effort}": name for model, name in _oai_thinking_models.items() for effort in _thinking_efforts
-@@ -61,7 +61,7 @@ _SECURITY_POLICY_ENGINES: dict[str, type[AgentDojoSecurityPolicyEngine]] = {
+ }
+@@ -47,8 +68,8 @@ _supported_model_names = {
+     "gpt-4o-mini-2024-07-18": "GPT-4",
+     "gpt-4.1-2025-04-14": "ChatGPT",
+     "gpt-4.1-nano-2025-04-14": "ChatGPT",
+-} | _oai_thinking_models_with_effort
+-suffixes = ["", "+camel", "+camel+secpol", "+camel+secpol+strict"]
++} | _oai_thinking_models_with_effort | _extra_models_from_env("CAMEL_EXTRA_MODELS")
++suffixes = ["", "+camel", "+camel-nopolicy", "+camel+secpol", "+camel+secpol+strict"]
+ 
+ CAMEL_MODEL_NAMES = {f"{model}{suffix}": name for model, name in _supported_model_names.items() for suffix in suffixes}
+ 
+@@ -61,7 +82,9 @@ _SECURITY_POLICY_ENGINES: dict[str, type[AgentDojoSecurityPolicyEngine]] = {
  
  
  def _is_oai_reasoning_model(model: str) -> bool:
 -    return "o4" in model or "o3" in model or "o1" in model or "codex" in model
++    if any(extra in model for extra in _extra_models_from_env("CAMEL_EXTRA_REASONING_MODELS")):
++        return True
 +    return "o4" in model or "o3" in model or "o1" in model or "codex" in model or "gpt-5" in model
  
  
  MODEL_NAMES.update(CAMEL_MODEL_NAMES)
-@@ -196,8 +196,9 @@ def make_tools_pipeline(
+@@ -96,6 +119,7 @@ def make_tools_pipeline(
+     ad_defense: str | None,
+     eval_mode: MetadataEvalMode,
+     q_llm: KnownModelName | None,
++    no_policy: bool = False,
+ ) -> agent_pipeline.AgentPipeline:
+     if "google" in model:
+         # vertexai.init(project=os.getenv("GCP_PROJECT"), location=os.getenv("GCP_LOCATION"))
+@@ -196,18 +220,20 @@ def make_tools_pipeline(
                  # Generates the code and writes it to `extra_args`
                  PrivilegedLLM(
                      llm,
 -                    ADNoSecurityPolicyEngine,
-+                    engine,
++                    ADNoSecurityPolicyEngine if no_policy else engine,
                      q_llm or model,
 +                    max_attempts=1,
                  ),
              ]
          )
+         # Used for logging
++        suffix = "+camel-nopolicy" if no_policy else "+camel"
+         if "openai" in model and _is_oai_reasoning_model(model):
+-            tools_pipeline.name = f"{model.split(':')[1]}-{reasoning_effort}+camel"
++            tools_pipeline.name = f"{model.split(':')[1]}-{reasoning_effort}{suffix}"
+         elif "anthropic" in model and (("3-7-sonnet" in model or "sonnet-4" in model) and thinking_budget_tokens):
+-            tools_pipeline.name = f"{model.split(':')[1]}-{thinking_budget_tokens}+camel"
++            tools_pipeline.name = f"{model.split(':')[1]}-{thinking_budget_tokens}{suffix}"
+         else:
+-            tools_pipeline.name = f"{model.split(':')[1]}+camel"
++            tools_pipeline.name = f"{model.split(':')[1]}{suffix}"
+ 
+         if q_llm:
+             tools_pipeline.name += f"-q:{q_llm.split(':')[1]}"
 diff --git a/src/camel/pipeline_elements/privileged_llm.py b/src/camel/pipeline_elements/privileged_llm.py
-index dd4736f..6c680b0 100644
+index dd4736f..e63bafa 100644
 --- a/src/camel/pipeline_elements/privileged_llm.py
 +++ b/src/camel/pipeline_elements/privileged_llm.py
 @@ -14,6 +14,7 @@
@@ -71,14 +128,14 @@ index dd4736f..6c680b0 100644
  import dataclasses
  import time
  from collections.abc import Callable, Iterable, Sequence
-@@ -32,6 +33,7 @@ from agentdojo.default_suites.v1.workspace.task_suite import (
- from pydantic_ai.models import KnownModelName
+@@ -33,6 +34,7 @@ from pydantic_ai.models import KnownModelName
  
  from camel import quarantined_llm, system_prompt_generator
-+from camel.security_policy import SecurityPolicyDeniedError
  from camel.capabilities import is_trusted
++from camel.security_policy import SecurityPolicyDeniedError
  from camel.interpreter import interpreter, result
  from camel.interpreter import namespace as ns
+ from camel.interpreter.value import CaMeLValue
 @@ -262,9 +264,13 @@ class PrivilegedLLM(agent_pipeline.BasePipelineElement):
  
          print(code)

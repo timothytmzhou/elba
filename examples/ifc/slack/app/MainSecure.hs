@@ -7,9 +7,7 @@ import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
 import IFC (DC, evalLIO, initialState, toLabeled, unlabel)
-import Data.Aeson (eitherDecode)
-import Data.Aeson.TH (defaultOptions, deriveFromJSON)
-import qualified Data.ByteString.Lazy as BL
+import InsecureApp (loadConfig, parseFlag)
 import LLM (Config (..), defaultConfig, defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
@@ -75,33 +73,14 @@ ifcGuidance =
       TH.lift contents
    )
 
-parseLogPath :: [String] -> Maybe FilePath
-parseLogPath ("--log-path" : p : _) = Just p
-parseLogPath (_ : rest) = parseLogPath rest
-parseLogPath [] = Nothing
-
-parseConfigPath :: [String] -> Maybe FilePath
-parseConfigPath ("--config" : p : _) = Just p
-parseConfigPath (_ : rest) = parseConfigPath rest
-parseConfigPath [] = Nothing
-
-$(deriveFromJSON defaultOptions ''Config)
-
-loadConfig :: FilePath -> IO Config
-loadConfig path = do
-  bs <- BL.readFile path
-  case eitherDecode bs of
-    Right cfg -> pure cfg
-    Left err -> error ("config decode failed: " ++ err)
-
 main :: IO ()
 main = do
   args <- getArgs
-  baseCfg <- maybe (pure defaultConfig) loadConfig (parseConfigPath args)
+  baseCfg <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
   withBridge $ do
     prompt <- readPrompt
     let cfg = baseCfg
-          { logPath = parseLogPath args
+          { logPath = parseFlag "--log-path" args
           , systemPrompt = defaultSystemPrompt ++ "\n" ++ ifcGuidance
           }
     let agentExpr = mkAgent cfg agentEnv prompt :: DC String

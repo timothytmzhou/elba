@@ -1,17 +1,33 @@
 cabal-version: 3.0
 name:          ifc
 version:       0.1.0.0
-synopsis:      Bindings for AgentDojo's slack default suite
+synopsis:      Bindings for AgentDojo's default suites (slack, workspace, travel, banking)
 license:       MIT
 build-type:    Simple
 
 extra-source-files:
   IfcGuidance.md
 
+common suite-app
+  default-language: GHC2024
+  build-depends:
+    aeson,
+    agents,
+    base >= 4.20 && < 5,
+    bytestring,
+    containers,
+    ifc,
+    lio,
+    template-haskell
+
 library
   exposed-modules:
+    -- shared
+    AgentDojoTypes
     Bridge
     IFC
+    InsecureApp
+    -- slack: worked IFC policy + secured surface
     Policy
     Slack
     SlackLabelTCB
@@ -19,8 +35,16 @@ library
     SlackTCB
     Web
     WebTCB
+    -- other suites: insecure tool surfaces + policy placeholders
+    -- (the secure modules are `undefined`, to be written by hand)
+    WorkspaceTCB
+    Workspace
+    TravelTCB
+    Travel
+    BankingTCB
+    Banking
 
-  hs-source-dirs:   lib, slack, slack/policy
+  hs-source-dirs:   lib, shared, slack, slack/policy, workspace, travel, banking
   default-language: GHC2024
   ghc-options:      -haddock
   build-depends:
@@ -30,33 +54,49 @@ library
     bytestring,
     containers,
     lio,
+    template-haskell,
     text
 
 executable agentdojo-slack
+  import:           suite-app
   main-is:          Main.hs
   hs-source-dirs:   slack/app
-  default-language: GHC2024
-  build-depends:
-    aeson,
-    agents,
-    base >= 4.20 && < 5,
-    bytestring,
-    ifc,
-    template-haskell
 
 executable agentdojo-slack-secure
+  import:           suite-app
   main-is:          MainSecure.hs
   hs-source-dirs:   slack/app
-  default-language: GHC2024
-  build-depends:
-    aeson,
-    agents,
-    base >= 4.20 && < 5,
-    bytestring,
-    filepath,
-    ifc,
-    lio,
-    template-haskell
+  build-depends:    filepath
+
+executable agentdojo-workspace
+  import:           suite-app
+  main-is:          Main.hs
+  hs-source-dirs:   workspace/app
+
+executable agentdojo-workspace-secure
+  import:           suite-app
+  main-is:          MainSecure.hs
+  hs-source-dirs:   workspace/app
+
+executable agentdojo-travel
+  import:           suite-app
+  main-is:          Main.hs
+  hs-source-dirs:   travel/app
+
+executable agentdojo-travel-secure
+  import:           suite-app
+  main-is:          MainSecure.hs
+  hs-source-dirs:   travel/app
+
+executable agentdojo-banking
+  import:           suite-app
+  main-is:          Main.hs
+  hs-source-dirs:   banking/app
+
+executable agentdojo-banking-secure
+  import:           suite-app
+  main-is:          MainSecure.hs
+  hs-source-dirs:   banking/app
 
 executable agentdojo-slack-reference
   main-is:          Reference.hs

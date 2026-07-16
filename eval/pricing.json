@@ -1,0 +1,14 @@
+{
+  "source": "https://platform.openai.com/docs/pricing",
+  "retrieved": "2026-07-16",
+  "unit": "USD per 1M tokens, standard tier",
+  "models": {
+    "gpt-5.4": {"input": 2.50, "cached_input": 0.25, "output": 15.00},
+    "gpt-5.4-mini": {"input": 0.75, "cached_input": 0.075, "output": 4.50},
+    "gpt-5.4-nano": {"input": 0.20, "cached_input": 0.02, "output": 1.25},
+    "gpt-4o": {"input": 2.50, "cached_input": 1.25, "output": 10.00},
+    "gpt-4o-mini": {"input": 0.15, "cached_input": 0.075, "output": 0.60},
+    "o4-mini": {"input": 1.10, "cached_input": 0.275, "output": 4.40},
+    "o3": {"input": 2.00, "cached_input": 0.50, "output": 8.00}
+  }
+}

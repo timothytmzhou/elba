@@ -1,70 +1,40 @@
-# CaMeL slack-suite evaluation
+# CaMeL baseline
 
-Reproduces the CaMeL numbers we use as a comparison baseline: AgentDojo's slack
-suite under `gpt-5.4` (high reasoning), `max_attempts=1`, and the slack policy
-engine wired into the live PrivilegedLLM, with a per-task 10-minute hard
-budget.
-
-## Setup
-
-From the repo root:
+The CaMeL comparison runs from a patched clone of
+[google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection)
+at `<repo>/camel` (gitignored). Everything is driven by `eval/run.py`:
+`execute.ensure_camel_checkout` clones and patches automatically, and each
+CaMeL task evaluation runs as
 
 ```bash
-bash eval/camel-eval/setup.sh         # clones camel/, applies our-changes.patch
+uv run --project camel --env-file camel/.env \
+    python eval/camel-eval/camel_worker.py '<atom json>'
 ```
 
-Then put your OpenAI key in `camel/.env` (`OPENAI_API_KEY="sk-..."`).
+so CaMeL's own pinned dependencies are used. The worker builds the pipeline
+with CaMeL's (patched) `make_tools_pipeline` and writes results in the
+standard AgentDojo layout, so `process.py` treats both systems uniformly.
 
-`uv` is required ([install](https://docs.astral.sh/uv/getting-started/installation/)).
-Dependencies are installed automatically on first `uv run`.
+## What our-changes.patch changes
 
-## Run
+- **`main.py`** — adds `--attack-name` and `--no-policy` flags (upstream
+  hardcodes `important_instructions` and the no-policy engine).
+- **`src/camel/models.py`** —
+  - registers `gpt-5.4-2026-03-05` as a reasoning model, recognizes the
+    `gpt-5` family in `_is_oai_reasoning_model`;
+  - `CAMEL_EXTRA_MODELS` / `CAMEL_EXTRA_REASONING_MODELS` env hooks to
+    register further models without editing the file;
+  - a `no_policy` parameter on `make_tools_pipeline`: off (our default) wires
+    in the suite's security engine with `max_attempts=1`; on uses
+    `ADNoSecurityPolicyEngine` with a `+camel-nopolicy` pipeline-name suffix
+    so the two variants' result caches don't collide.
+- **`src/camel/pipeline_elements/privileged_llm.py`** — catches
+  `SecurityPolicyDeniedError` and routes it through `CaMeLException` so a
+  policy denial fails the task cleanly instead of crashing the benchmark.
 
-**With-policy baseline + both attacks** (long: ~6–8 hours total):
+## Regenerating the patch after upstream changes
 
 ```bash
-python3 eval/camel-eval/orchestrator.py
+git -C camel diff main.py src/camel/models.py \
+    src/camel/pipeline_elements/privileged_llm.py > eval/camel-eval/our-changes.patch
 ```
-
-Runs three phases sequentially against `slack`: baseline (no attack), then
-`--run-attack --attack-name important_instructions`, then `--attack-name
-direct`. Per-task watchdog kills any single (user_task × injection_task) eval
-that exceeds 10 minutes; the killed eval is recorded with `utility=False,
-security=True` so the suite resumes from cache. Final aggregate at
-`logs/camel-summary.txt`.
-
-**No-policy baseline** (after the with-policy run finishes):
-
-```bash
-bash eval/camel-eval/nopolicy-runner.sh
-```
-
-Waits for the with-policy summary, then patches `models.py` to use
-`ADNoSecurityPolicyEngine` (with a `+camel-nopolicy` pipeline-name suffix so
-the cache doesn't collide), reruns the slack baseline, appends a row to
-`logs/camel-summary.txt`, and restores `models.py` afterward.
-
-## Outputs
-
-- `logs/camel-summary.txt` — final aggregate.
-- `logs/camel-orchestrator.log`, `logs/camel-nopolicy-orchestrator.log` —
-  per-iteration progress.
-- `logs/camel-slack-{secpol,attack-important,attack-direct}.stdout.log`,
-  `logs/camel-nopolicy.stdout.log` — raw camel stdout.
-- `camel/logs/<pipeline-name>/slack/user_task_<i>/<attack>/<inj>.json` —
-  per-evaluation traces (model output, tool calls, utility, security, duration).
-
-## What the patch changes
-
-`eval/camel-eval/our-changes.patch` modifies upstream camel/ in three files:
-
-- `main.py`: adds `--attack-name` CLI flag (upstream hardcodes
-  `important_instructions`).
-- `src/camel/models.py`: registers `gpt-5.4-2026-03-05` as a reasoning model;
-  recognizes `gpt-5` family in `_is_oai_reasoning_model`; default branch passes
-  the suite-specific `engine` (instead of `ADNoSecurityPolicyEngine`) and
-  `max_attempts=1` to `PrivilegedLLM`.
-- `src/camel/pipeline_elements/privileged_llm.py`: catches
-  `SecurityPolicyDeniedError` in `run_code` and routes it through
-  `CaMeLException` so a denial fails the task cleanly instead of crashing the
-  benchmark.
