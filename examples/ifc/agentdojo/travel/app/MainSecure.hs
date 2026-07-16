@@ -1,37 +1,15 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Main where
 
-import AgentApp (ifcTools, runSecureAgent)
-import Env (Env (..), defEnv)
-import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
-import TH (addTools)
-import Text.Printf (printf)
-import Travel
+import AgentApp (runSecureAgent)
+import Env (Env (..), Extension (OverloadedStrings), defEnv)
 
 agentEnv :: Env
 agentEnv =
-  $( addTools $
-     ifcTools
-       ++ [ ''Email
-         , ''CalendarEvent
-         , 'getUserInformation
-         , 'getAllHotelsInCity
-         , 'getHotelsPrices
-         , 'reserveHotel
-         , 'getAllRestaurantsInCity
-         , 'getPriceForRestaurants
-         , 'reserveRestaurant
-         , 'getFlightInformation
-         , 'createCalendarEvent
-         , 'sendEmail
-         , 'printf
-         ]
-   )
-    defEnv
-      { extensions = [OverloadedStrings]
-      , silentModules = ["IFC"]
-      }
+  defEnv
+    { modules = ["Travel", "IFC"]
+    , functions = [("Text.Printf", "printf")]
+    , extensions = [OverloadedStrings]
+    }
 
 main :: IO ()
 main = runSecureAgent agentEnv id

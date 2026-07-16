@@ -54,9 +54,9 @@ stub_agent.py  scripted fake agent; lets tests run the whole pipeline
 tests/         pytest suite, no LLM calls:  python -m pytest eval/tests
 ```
 
-Each suite's agent apps live in `examples/ifc/agentdojo/<suite>/app/`; the
-tool list is enumerated per app with `addTools` so every tool keeps its
-Haddock docstring in the prompt.
+Each suite's agent apps live in `examples/ifc/agentdojo/<suite>/app/`. An
+app declares its tool modules in the `Env` and the agent sees every export
+with its Haddock docstring in the prompt.
 
 ## The run matrix
 

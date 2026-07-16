@@ -2,55 +2,20 @@
 
 module Main where
 
-import AgentApp (ifcTools, runSecureAgent)
-import Env (Env (..), defEnv)
+import AgentApp (runSecureAgent)
+import Env (Env (..), Extension (OverloadedStrings), defEnv)
 import LLM (Config (..), defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
-import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import Language.Haskell.TH.Syntax qualified as TH
-import Slack
 import System.FilePath (takeDirectory, (</>))
-import TH (addTools)
-import Text.Printf (printf)
-import Web
 
 agentEnv :: Env
 agentEnv =
-  $( addTools $
-     ifcTools
-       ++ [ -- Slack types
-           ''Body
-         , ''LabeledMessage
-           -- Web type
-         , ''Url
-           -- Slack ids
-         , 'channelName
-         , 'userName
-         , 'channelID
-         , 'userID
-           -- Slack reads
-         , 'getChannels
-         , 'readChannelMessages
-         , 'readInbox
-         , 'getUsersInChannel
-           -- Slack writes
-         , 'addUserToChannel
-         , 'inviteUserToSlack
-         , 'removeUserFromSlack
-         , 'sendDirectMessage
-         , 'sendChannelMessage
-           -- Web tools
-         , 'getWebpage
-         , 'postWebpage
-           -- prompt formatting
-         , 'printf
-         ]
-   )
-    defEnv
-      { extensions = [OverloadedStrings]
-      , -- SlackPrincipal keeps the opaque id types nameable
-        silentModules = ["IFC", "SlackPrincipal"]
-      }
+  defEnv
+    { modules = ["Slack", "Web", "IFC"]
+    , functions = [("Text.Printf", "printf")]
+    , extensions = [OverloadedStrings]
+    }
 
 -- Information-flow guidance appended to the default system prompt.
 ifcGuidance :: String

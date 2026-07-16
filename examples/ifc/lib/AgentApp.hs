@@ -5,7 +5,6 @@ module AgentApp
   ( runInsecureAgent
   , runSecureAgent
   , runDC
-  , ifcTools
   ) where
 
 import Agents (mkAgent)
@@ -15,19 +14,14 @@ import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
 import Env (Env (..))
-import IFC (DC, toLabeled, unlabel)
+import IFC (DC)
 import LIO (evalLIO)
 import LIO.DCLabel (cFalse, cTrue, (%%))
 import LIO.TCB (LIOState (..))
 import LLM (Config (..), defaultConfig)
-import Language.Haskell.TH.Syntax (Name)
 import System.Environment (getArgs)
 
 $(deriveFromJSON defaultOptions ''Config)
-
--- | The IFC combinators every secure suite hands to its agent.
-ifcTools :: [Name]
-ifcTools = ['unlabel, 'toLabeled]
 
 -- | Runs a DC computation from a public trusted starting label.
 runDC :: DC a -> IO a

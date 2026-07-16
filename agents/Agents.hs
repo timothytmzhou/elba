@@ -6,9 +6,13 @@ module Agents
   ) where
 
 import Control.Monad.Catch (try)
+import Data.Char (isAlpha)
 import Data.List (isPrefixOf)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
+import Docs (ResolvedTool (..), resolveTools)
 import Env
 import GHC.IO (unsafePerformIO)
 import LLM
@@ -16,6 +20,42 @@ import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeInterpret, unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
+
+-- TypeEnv: name -> (signature, optional docstring). Show formats each entry
+-- as `name :: signature`, optionally followed by an indented doc.
+newtype TypeEnv = TypeEnv (Map String (String, Maybe String))
+
+instance Show TypeEnv where
+  show (TypeEnv m) =
+    unlines
+      [ entry name sig mDoc
+      | (name, (sig, mDoc)) <- Map.toList m
+      ]
+    where
+      entry name sig Nothing = name ++ " :: " ++ sig
+      entry name sig (Just doc) =
+        name
+          ++ " :: "
+          ++ sig
+          ++ "\n"
+          ++ unlines ["    " ++ ln | ln <- lines doc]
+
+setEnv :: Env -> [ResolvedTool] -> [ModuleName] -> Interpreter TypeEnv
+setEnv env tools baseModules = do
+  setImportsF $
+    [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
+      ++ [ ModuleImport m NotQualified (ImportList [parenIfOp n])
+         | (m, n) <- functions env
+         ]
+  let values = [t | t <- tools, toolIsValue t]
+  sigs <- mapM (typeOf . parenIfOp . toolName) values
+  pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
+
+-- Wrap operator names in parens so they're valid in import lists and
+-- in `typeOf` queries (e.g. `(%%)`, not `%%`).
+parenIfOp :: String -> String
+parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
+parenIfOp s = s
 
 buildContext :: forall a. (Typeable a) => Proxy a -> [(String, String)] -> TypeEnv -> String -> String
 buildContext proxy aliases typeEnv task =
@@ -77,9 +117,10 @@ mkAgent config _ _
 mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
     ask <- withSession config
+    tools <- resolveTools env
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
-      typeEnv <- setEnv env baseModules
+      typeEnv <- setEnv env tools baseModules
       let ctx = buildContext (Proxy :: Proxy a) (typeAliases env) typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))

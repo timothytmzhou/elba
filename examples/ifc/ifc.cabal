@@ -13,8 +13,7 @@ common suite-app
   build-depends:
     agents,
     base >= 4.20 && < 5,
-    ifc,
-    template-haskell
+    ifc
 
 library
   exposed-modules:
@@ -66,7 +65,9 @@ executable agentdojo-slack-secure
   import:           suite-app
   main-is:          MainSecure.hs
   hs-source-dirs:   agentdojo/slack/app
-  build-depends:    filepath
+  build-depends:
+    filepath,
+    template-haskell
 
 executable agentdojo-workspace
   import:           suite-app
