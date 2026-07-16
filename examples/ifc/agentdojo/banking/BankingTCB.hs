@@ -2,10 +2,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Insecure tool surface for AgentDojo's @banking@ suite (transactions,
--- balance, scheduled payments, user account, a file reader). This is the
--- no-policy surface used by @agentdojo-banking@; the IFC-secured surface is
--- left to be written by hand (see banking/policy/Policy.hs).
 module BankingTCB
   ( Transaction (..)
   , StringMap

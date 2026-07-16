@@ -1,12 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Haskell mirrors of the pydantic record types AgentDojo's
--- workspace/travel/banking suites return over the JSON bridge. Field
--- names follow the JSON keys produced by @model_dump(mode="json")@ (see
--- eval/evalkit/bridge.py). Parsers are deliberately lenient: optional
--- fields default rather than fail, so schema drift in unused fields does
--- not break a run.
 --
 -- These are the /insecure/ read types shared by more than one suite
 -- (email + calendar appear in both workspace and travel). Suite-specific

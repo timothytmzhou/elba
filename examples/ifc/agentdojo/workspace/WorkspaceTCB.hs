@@ -1,11 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Insecure tool surface for AgentDojo's @workspace@ suite (email +
--- calendar + cloud drive). Each binding forwards to the Python tool of the
--- same snake_case name over the JSON bridge. This is the no-policy surface
--- used by the @agentdojo-workspace@ executable; the IFC-secured surface is
--- left to be written by hand (see workspace/policy/Policy.hs).
 module WorkspaceTCB
   ( module AgentDojoTypes
     -- * Email

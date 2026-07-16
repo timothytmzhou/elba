@@ -1,12 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- | Insecure tool surface for AgentDojo's @travel@ suite (hotels,
--- restaurants, car rentals, flights, plus a little calendar + email).
--- Most travel tools return human-readable strings or string maps rather
--- than structured records, so the bindings are thin. This is the
--- no-policy surface used by @agentdojo-travel@; the IFC-secured surface is
--- left to be written by hand (see travel/policy/Policy.hs).
 module TravelTCB
   ( module AgentDojoTypes
   , StringMap

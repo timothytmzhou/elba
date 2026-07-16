@@ -1,12 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- Shared main for the agent executables. Each suite app builds a tool Env
--- and hands it to one of the drivers below. The orphan FromJSON Config
--- lives here so every executable shares one copy.
 module AgentApp
   ( runInsecureAgent
   , runSecureAgent
+  , runDC
   ) where
 
 import Agents (mkAgent)
@@ -16,11 +14,19 @@ import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
 import Env (Env (..))
-import IFC (DC, runDC)
+import IFC (DC)
+import LIO (evalLIO)
+import LIO.DCLabel (cFalse, cTrue, (%%))
+import LIO.TCB (LIOState (..))
 import LLM (Config (..), defaultConfig)
 import System.Environment (getArgs)
 
 $(deriveFromJSON defaultOptions ''Config)
+
+-- | Runs a DC computation from a public trusted starting label.
+runDC :: DC a -> IO a
+runDC m =
+  evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
 parseFlag :: String -> [String] -> Maybe FilePath
 parseFlag flag (a : v : _) | a == flag = Just v

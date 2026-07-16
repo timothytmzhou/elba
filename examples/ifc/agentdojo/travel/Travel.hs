@@ -1,8 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 
--- IFC secured surface for the travel suite. The policy is not written yet.
--- Every binding is undefined and the signatures are provisional. Follow
--- the slack suite as the worked reference.
 module Travel
   ( DC
   , DCLabeled

@@ -1,6 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- No policy agent app for the banking suite.
 module Main where
 
 import AgentApp (runInsecureAgent)

@@ -1,24 +1,17 @@
 {-# LANGUAGE Trustworthy #-}
 
--- The IFC surface. DC is lio's type synonym and opacity is lio's own model.
--- The LIOTCB constructor and the TCB primitives live in the Unsafe LIO.TCB
--- module, so safely interpreted code can sequence DC computations but cannot
--- unwrap them or perform IO. The agent env imports only unlabel and
--- toLabeled from here, by name. runDC is the host entry point and never
--- reaches the interpreter. Tool implementations use Policy and lio directly.
 module IFC
   ( DC,
     DCLabeled,
     toLabeled,
     unlabel,
-    runDC,
   )
 where
 
-import LIO (evalLIO, getClearance, glb, setClearance, taint)
-import LIO.DCLabel (DC, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
+import LIO (getClearance, glb, setClearance, taint)
+import LIO.DCLabel (DC, DCLabeled, cTrue, dcIntegrity, (%%))
 import LIO.TCB
-  ( LIOState (..),
+  ( LIOState (lioClearance, lioLabel),
     Labeled (LabeledTCB),
     getLIOStateTCB,
     putLIOStateTCB,
@@ -40,8 +33,3 @@ unlabel (LabeledTCB l v) = do
   setClearance (c `glb` (dcIntegrity l %% cTrue))
   taint l
   return v
-
--- | Runs a DC computation from a public trusted starting label.
-runDC :: DC a -> IO a
-runDC m =
-  evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}

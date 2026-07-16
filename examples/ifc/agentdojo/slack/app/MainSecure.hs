@@ -1,14 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC secured agent app for the slack suite. ChannelID and UserID stay out
--- of the tool list because addTools would leak their constructors and their
--- defining module is unsafe to import. The agent still sees them in the
--- tool signatures.
 module Main where
 
 import AgentApp (runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (DC, DCLabeled, toLabeled, unlabel)
+import IFC (toLabeled, unlabel)
 import LLM (Config (..), defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
@@ -25,8 +21,6 @@ agentEnv =
        [ -- Slack types
          ''Body
        , ''LabeledMessage
-       , ''DC
-       , ''DCLabeled
          -- Web type
        , ''Url
          -- Slack ids
@@ -57,9 +51,8 @@ agentEnv =
    )
     defEnv
       { extensions = [OverloadedStrings]
-      , -- brings the opaque ChannelID and UserID types into scope so tool
-        -- signatures render them unqualified and annotations typecheck
-        silentModules = ["SlackPrincipal"]
+      , -- SlackPrincipal keeps the opaque id types nameable
+        silentModules = ["IFC", "SlackPrincipal"]
       }
 
 -- Information-flow guidance appended to the default system prompt.
