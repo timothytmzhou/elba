@@ -43,7 +43,7 @@ instance Show TypeEnv where
 setEnv :: Env -> [ResolvedTool] -> [ModuleName] -> Interpreter TypeEnv
 setEnv env tools baseModules = do
   setImportsF $
-    [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
+    [ModuleImport m NotQualified NoImportList | m <- modules env ++ ambient env ++ baseModules]
       ++ [ ModuleImport m NotQualified (ImportList [parenIfOp n])
          | (m, n) <- functions env
          ]

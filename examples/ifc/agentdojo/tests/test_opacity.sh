@@ -40,6 +40,7 @@ reject "name runDC"          'let f = runDC in return "x"'
 reject "name LIO monad"      'return "x" :: LIO DCLabel String'
 reject "name DCLabel"        'return (undefined :: DCLabel) >> return "x"'
 accept "annotate with DC"    'return "x" :: DC String'
+accept "ambient list helper" 'return (nub "aab")'
 accept "benign"              'return "done"'
 accept "real tool"           'do { _ <- getChannels; return "ok" }'
 
