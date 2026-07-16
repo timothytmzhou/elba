@@ -1,11 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC secured agent app for the banking suite. The Banking policy is
--- undefined so this builds but fails at run time on the first tool call.
+-- IFC secured agent app for the banking suite. The Banking policy is undefined so
+-- this builds but fails at run time on the first tool call.
 module Main where
 
 import Agents (mkAgent)
-import Banking
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
@@ -19,35 +18,11 @@ import Text.Printf (printf)
 
 agentEnv :: Env
 agentEnv =
-  $( addTools
-       [ -- types
-         ''Transaction
-       , ''DC
-       , ''DCLabeled
-         -- account
-       , 'getIban
-       , 'getBalance
-       , 'getUserInfo
-       , 'updatePassword
-       , 'updateUserInfo
-         -- transactions
-       , 'sendMoney
-       , 'scheduleTransaction
-       , 'updateScheduledTransaction
-       , 'getMostRecentTransactions
-       , 'getScheduledTransactions
-         -- files
-       , 'readFile_
-         -- IFC API
-       , 'unlabel
-       , 'toLabeled
-         -- prompt formatting
-       , 'printf
-       ]
-   )
+  $(addTools ['unlabel, 'toLabeled, 'printf])
     defEnv
-      { extensions = [OverloadedStrings]
+      { modules = ["Banking"]
       , silentModules = ["IFC"]
+      , extensions = [OverloadedStrings]
       }
 
 main :: IO ()

@@ -15,7 +15,8 @@ EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
 from experiment import Atom, Model, expand, split_cached  # noqa: E402
-from execute import run_atoms, to_jsonable  # noqa: E402
+from bridge import to_jsonable  # noqa: E402
+from runner import run_atoms  # noqa: E402
 from process import (  # noqa: E402
     clustered_utility_ci, load_results, newcombe_paired_diff, process,
     suite_table, t_quantile_975, wilson_interval,
@@ -130,15 +131,15 @@ def slack_run(tmp_path):
              attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
-    import execute
-    orig = execute.resolve_typeguard_exes
-    execute.resolve_typeguard_exes = lambda atoms, build=True: {
+    import runner
+    orig = runner.resolve_typeguard_exes
+    runner.resolve_typeguard_exes = lambda atoms, build=True: {
         "agentdojo-slack-secure": exe, "agentdojo-slack": exe}
     try:
         report = run_atoms(atoms, models, logdir, "v1.2.2", timeout_s=60,
                            max_workers=2, build=False)
     finally:
-        execute.resolve_typeguard_exes = orig
+        runner.resolve_typeguard_exes = orig
     return models, logdir, report
 
 
@@ -177,14 +178,14 @@ def test_timeout_writes_failure(tmp_path):
     models = {m.name: m}
     exe = stub_exe(tmp_path, [{"sleep": 60}, {"done": "too late"}])
     atom = Atom("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    import execute
-    orig = execute.resolve_typeguard_exes
-    execute.resolve_typeguard_exes = lambda atoms, build=True: {"agentdojo-slack-secure": exe}
+    import runner
+    orig = runner.resolve_typeguard_exes
+    runner.resolve_typeguard_exes = lambda atoms, build=True: {"agentdojo-slack-secure": exe}
     try:
         report = run_atoms([atom], models, tmp_path / "logs", "v1.2.2",
                            timeout_s=3, max_workers=1, build=False)
     finally:
-        execute.resolve_typeguard_exes = orig
+        runner.resolve_typeguard_exes = orig
     result = json.loads(atom.result_path(tmp_path / "logs", models).read_text())
     assert result["utility"] is False
     assert report["completed"] + report["timeout"] == 1

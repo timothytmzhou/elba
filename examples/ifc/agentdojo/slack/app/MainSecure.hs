@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+-- IFC secured agent app for the slack suite. The tool set is the whole
+-- Slack and Web secured surface plus the IFC API and printf.
 module Main where
 
 import Agents (mkAgent)
@@ -12,57 +14,20 @@ import LLM (Config (..), defaultConfig, defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import Language.Haskell.TH.Syntax qualified as TH
-import Slack
 import System.Environment (getArgs)
 import System.FilePath (takeDirectory, (</>))
 import TH (addTools)
 import Text.Printf (printf)
-import Web
 
 agentEnv :: Env
 agentEnv =
-  $( addTools
-       [ -- Slack types
-         ''Body
-       , ''LabeledMessage
-       , ''ChannelID
-       , ''UserID
-       , ''DC
-       , ''DCLabeled
-         -- Web type
-       , ''Url
-         -- Slack ids
-       , 'channelName
-       , 'userName
-       , 'channelID
-       , 'userID
-         -- Slack reads
-       , 'getChannels
-       , 'readChannelMessages
-       , 'readInbox
-       , 'getUsersInChannel
-         -- Slack writes
-       , 'addUserToChannel
-       , 'inviteUserToSlack
-       , 'removeUserFromSlack
-       , 'sendDirectMessage
-       , 'sendChannelMessage
-         -- Web tools
-       , 'getWebpage
-       , 'postWebpage
-         -- IFC API
-       , 'unlabel
-       , 'toLabeled
-         -- prompt formatting
-       , 'printf
-       ]
-   )
+  $(addTools ['unlabel, 'toLabeled, 'printf])
     defEnv
-      { extensions = [OverloadedStrings]
+      { modules = ["Slack", "Web"]
       , silentModules = ["IFC"]
+      , extensions = [OverloadedStrings]
       }
 
--- Information-flow guidance appended to the default system prompt.
 ifcGuidance :: String
 ifcGuidance =
   $( do

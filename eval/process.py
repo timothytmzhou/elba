@@ -1,6 +1,6 @@
 """Turn the result tree into the raw dump and the LaTeX tables.
 
-Reads only what execute.py wrote. Writes under <logdir>/results/.
+Reads only what the runner wrote. Writes under <logdir>/results/.
 
     dump.jsonl                everything tracked per task evaluation
     table_<suite>.tex         the paper table for one suite

@@ -66,7 +66,7 @@ def main() -> int:
                     return 1
                 if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
                     return 1
-            from execute import run_atoms
+            from runner import run_atoms
 
             report = run_atoms(to_run, models, logdir, args.benchmark_version,
                                args.timeout, max_workers, build=not args.no_build)

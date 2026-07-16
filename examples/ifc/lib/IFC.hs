@@ -2,6 +2,12 @@
 
 module IFC
   ( DC,
+    -- Re-exported so the interpreter session can name the DC and DCLabeled
+    -- type synonyms once they are expanded by the required type.
+    LIO,
+    DCLabel,
+    DCLabeled,
+    Labeled,
     LIOState (..),
     evalLIO,
     initialState,
@@ -11,7 +17,7 @@ module IFC
 where
 
 import LIO (LIO, LIOState (..), Label, evalLIO, getClearance, glb, setClearance, taint)
-import LIO.DCLabel (DC, DCLabel, cFalse, cTrue, dcIntegrity, (%%))
+import LIO.DCLabel (DC, DCLabel, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
 import LIO.Labeled (Labeled)
 import LIO.TCB
   ( LIOState (lioClearance, lioLabel),

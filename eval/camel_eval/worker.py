@@ -1,7 +1,7 @@
 """Run one CaMeL task evaluation inside the CaMeL checkout environment.
 
     uv run --project camel --env-file camel/.env \
-        python eval/camel-eval/camel_worker.py '<atom json>'
+        python eval/camel_eval/worker.py '<atom json>'
 
 Builds the pipeline with CaMeL's patched make_tools_pipeline and writes the
 result in the standard AgentDojo layout.

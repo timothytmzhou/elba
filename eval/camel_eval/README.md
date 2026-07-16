@@ -8,14 +8,14 @@ CaMeL task evaluation runs as
 
 ```bash
 uv run --project camel --env-file camel/.env \
-    python eval/camel-eval/camel_worker.py '<atom json>'
+    python eval/camel_eval/worker.py '<atom json>'
 ```
 
 so CaMeL's own pinned dependencies are used. The worker builds the pipeline
 with CaMeL's (patched) `make_tools_pipeline` and writes results in the
 standard AgentDojo layout, so `process.py` treats both systems uniformly.
 
-## What our-changes.patch changes
+## What changes.patch changes
 
 - **`main.py`** — adds `--attack-name` and `--no-policy` flags (upstream
   hardcodes `important_instructions` and the no-policy engine).
@@ -36,5 +36,5 @@ standard AgentDojo layout, so `process.py` treats both systems uniformly.
 
 ```bash
 git -C camel diff main.py src/camel/models.py \
-    src/camel/pipeline_elements/privileged_llm.py > eval/camel-eval/our-changes.patch
+    src/camel/pipeline_elements/privileged_llm.py > eval/camel_eval/changes.patch
 ```
