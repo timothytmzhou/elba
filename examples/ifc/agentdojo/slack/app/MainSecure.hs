@@ -2,9 +2,8 @@
 
 module Main where
 
-import AgentApp (runSecureAgent)
+import AgentApp (ifcTools, runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (toLabeled, unlabel)
 import LLM (Config (..), defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
@@ -17,37 +16,35 @@ import Web
 
 agentEnv :: Env
 agentEnv =
-  $( addTools
-       [ -- Slack types
-         ''Body
-       , ''LabeledMessage
-         -- Web type
-       , ''Url
-         -- Slack ids
-       , 'channelName
-       , 'userName
-       , 'channelID
-       , 'userID
-         -- Slack reads
-       , 'getChannels
-       , 'readChannelMessages
-       , 'readInbox
-       , 'getUsersInChannel
-         -- Slack writes
-       , 'addUserToChannel
-       , 'inviteUserToSlack
-       , 'removeUserFromSlack
-       , 'sendDirectMessage
-       , 'sendChannelMessage
-         -- Web tools
-       , 'getWebpage
-       , 'postWebpage
-         -- IFC API
-       , 'unlabel
-       , 'toLabeled
-         -- prompt formatting
-       , 'printf
-       ]
+  $( addTools $
+     ifcTools
+       ++ [ -- Slack types
+           ''Body
+         , ''LabeledMessage
+           -- Web type
+         , ''Url
+           -- Slack ids
+         , 'channelName
+         , 'userName
+         , 'channelID
+         , 'userID
+           -- Slack reads
+         , 'getChannels
+         , 'readChannelMessages
+         , 'readInbox
+         , 'getUsersInChannel
+           -- Slack writes
+         , 'addUserToChannel
+         , 'inviteUserToSlack
+         , 'removeUserFromSlack
+         , 'sendDirectMessage
+         , 'sendChannelMessage
+           -- Web tools
+         , 'getWebpage
+         , 'postWebpage
+           -- prompt formatting
+         , 'printf
+         ]
    )
     defEnv
       { extensions = [OverloadedStrings]

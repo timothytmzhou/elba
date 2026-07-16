@@ -2,9 +2,8 @@
 
 module Main where
 
-import AgentApp (runSecureAgent)
+import AgentApp (ifcTools, runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (toLabeled, unlabel)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import TH (addTools)
 import Text.Printf (printf)
@@ -12,27 +11,26 @@ import Workspace
 
 agentEnv :: Env
 agentEnv =
-  $( addTools
-       [ ''Email
-       , ''EmailContact
-       , ''CalendarEvent
-       , ''CloudDriveFile
-       , ''CloudFileId
-       , 'getReceivedEmails
-       , 'searchEmails
-       , 'sendEmail
-       , 'searchContactsByName
-       , 'searchCalendarEvents
-       , 'createCalendarEvent
-       , 'listFiles
-       , 'searchFiles
-       , 'getFileById
-       , 'createFile
-       , 'shareFile
-       , 'unlabel
-       , 'toLabeled
-       , 'printf
-       ]
+  $( addTools $
+     ifcTools
+       ++ [ ''Email
+         , ''EmailContact
+         , ''CalendarEvent
+         , ''CloudDriveFile
+         , ''CloudFileId
+         , 'getReceivedEmails
+         , 'searchEmails
+         , 'sendEmail
+         , 'searchContactsByName
+         , 'searchCalendarEvents
+         , 'createCalendarEvent
+         , 'listFiles
+         , 'searchFiles
+         , 'getFileById
+         , 'createFile
+         , 'shareFile
+         , 'printf
+         ]
    )
     defEnv
       { extensions = [OverloadedStrings]
