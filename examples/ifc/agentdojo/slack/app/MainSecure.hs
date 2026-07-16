@@ -13,7 +13,6 @@ agentEnv :: Env
 agentEnv =
   defEnv
     { modules = ["Slack", "Web", "IFC"]
-    , functions = [("Text.Printf", "printf")]
     , extensions = [OverloadedStrings]
     }
 

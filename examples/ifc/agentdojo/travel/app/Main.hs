@@ -7,7 +7,6 @@ agentEnv :: Env
 agentEnv =
   defEnv
     { modules = ["TravelTCB"]
-    , functions = [("Text.Printf", "printf")]
     , extensions = [OverloadedStrings]
     }
 

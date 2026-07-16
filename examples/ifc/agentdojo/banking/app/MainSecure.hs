@@ -7,7 +7,6 @@ agentEnv :: Env
 agentEnv =
   defEnv
     { modules = ["Banking", "IFC"]
-    , functions = [("Text.Printf", "printf")]
     , extensions = [OverloadedStrings]
     }
 

@@ -39,16 +39,16 @@ data ResolvedTool = ResolvedTool
     toolDoc :: Maybe String
   }
 
--- Resolution is cached per tool spec. Subagents reuse their parent's Env,
--- so recursive mkAgent calls never open a second GHC session while the
--- interpreter session is live.
+-- Resolution is cached per module list. Subagents reuse their parent's
+-- Env, so recursive mkAgent calls never open a second GHC session while
+-- the interpreter session is live.
 {-# NOINLINE cache #-}
-cache :: IORef (Map ([String], [(String, String)]) [ResolvedTool])
+cache :: IORef (Map [String] [ResolvedTool])
 cache = unsafePerformIO (newIORef Map.empty)
 
 resolveTools :: Env -> IO [ResolvedTool]
 resolveTools env = do
-  let key = (modules env, functions env)
+  let key = modules env
   cached <- Map.lookup key <$> readIORef cache
   case cached of
     Just tools -> pure tools
@@ -57,25 +57,22 @@ resolveTools env = do
       atomicModifyIORef' cache (\m -> (Map.insert key tools m, ()))
       pure tools
 
-resolve :: ([String], [(String, String)]) -> IO [ResolvedTool]
-resolve (mods, fns) =
+resolve :: [String] -> IO [ResolvedTool]
+resolve mods =
   runGhc (Just libdir) $ do
     dflags <- getSessionDynFlags
     logger <- getLogger
     (dflags', _, _) <- parseDynamicFlags logger dflags []
     _ <- setSessionDynFlags dflags'
-    fromModules <- mapM (exportsOf Nothing) mods
-    picked <- mapM (\(m, n) -> exportsOf (Just n) m) fns
-    pure (concat (fromModules ++ picked))
+    concat <$> mapM exportsOf mods
 
-exportsOf :: Maybe String -> String -> Ghc [ResolvedTool]
-exportsOf only modname = do
+exportsOf :: String -> Ghc [ResolvedTool]
+exportsOf modname = do
   m <- findModule (mkModuleName modname) Nothing
   info <-
     maybe (error ("Docs.resolveTools: no module info for " ++ modname)) pure
       =<< getModuleInfo m
-  let wanted n = maybe True (== getOccString n) only
-  mapM describe [n | n <- modInfoExports info, wanted n]
+  mapM describe (modInfoExports info)
 
 describe :: Name -> Ghc ResolvedTool
 describe n = do

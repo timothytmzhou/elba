@@ -7,7 +7,6 @@ agentEnv :: Env
 agentEnv =
   defEnv
     { modules = ["SlackTCB", "WebTCB"]
-    , functions = [("Text.Printf", "printf")]
     , extensions = [OverloadedStrings]
     }
 

@@ -42,11 +42,8 @@ instance Show TypeEnv where
 
 setEnv :: Env -> [ResolvedTool] -> [ModuleName] -> Interpreter TypeEnv
 setEnv env tools baseModules = do
-  setImportsF $
+  setImportsF
     [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
-      ++ [ ModuleImport m NotQualified (ImportList [parenIfOp n])
-         | (m, n) <- functions env
-         ]
   let values = [t | t <- tools, toolIsValue t]
   sigs <- mapM (typeOf . parenIfOp . toolName) values
   pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
@@ -147,6 +144,7 @@ mkAgent config env userPrompt = unsafePerformIO $
       , "Data.Ord"
       , "Data.Traversable"
       , "Data.Tuple"
+      , "Text.Printf"
       , "Text.Read"
       , -- plumbing the subagent wrapper needs
         "LLM"
