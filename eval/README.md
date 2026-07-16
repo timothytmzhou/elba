@@ -54,9 +54,9 @@ stub_agent.py  scripted fake agent; lets tests run the whole pipeline
 tests/         pytest suite, no LLM calls:  python -m pytest eval/tests
 ```
 
-The agent's tool set is imported by whole module: each suite app lists its
-`SlackTCB`/`WorkspaceTCB`/... module in the `Env`'s `modules` field rather
-than enumerating every tool name (`examples/ifc/agentdojo/*/app/Main.hs`).
+Each suite's agent apps live in `examples/ifc/agentdojo/<suite>/app/`; the
+tool list is enumerated per app with `addTools` so every tool keeps its
+Haddock docstring in the prompt.
 
 ## The run matrix
 
@@ -77,8 +77,8 @@ minutes (`--timeout`), as in the paper; timed-out tasks are recorded as
 TypeGuard's `policy` variant only runs on suites whose IFC policies exist —
 currently slack (`experiment.TYPEGUARD_POLICY_SUITES`). The other suites'
 secure surfaces are `undefined` placeholders to be written by hand
-(`examples/ifc/{workspace,travel,banking}/<Suite>.hs`); their no-policy
-variants run everywhere. CaMeL ships policies for all four suites.
+(`examples/ifc/agentdojo/{workspace,travel,banking}/<Suite>.hs`); their
+no-policy variants run everywhere. CaMeL ships policies for all four suites.
 
 ## Adding a model
 

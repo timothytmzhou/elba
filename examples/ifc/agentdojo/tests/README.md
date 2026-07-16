@@ -1,44 +1,28 @@
-# IFC tests for the secure slack/web wrapper
+# Reference and opacity tests for the slack suite
 
-These tests exercise the `Slack`/`Web`/`ToLabeled` modules against
-AgentDojo's slack environment without involving the LLM agent. Each
-test is one DC computation that either:
+No LLM involved. Two kinds of check:
 
-- **`pass-*`** — completes without a label error (legitimate flow,
-  analogous to AgentDojo user tasks).
-- **`fail-*`** — is blocked by a label error (attack flow,
-  analogous to AgentDojo injection tasks).
-
-The test binary [`Tests.hs`](Tests.hs) dispatches by test name. The
-Python driver [`run_tests.py`](run_tests.py) loads AgentDojo's slack
-environment, spawns the binary once per test, and serves bridge
-calls.
-
-## Tests
-
-### Pass
-
-| name | description |
-|---|---|
-| `pass-simple-send` | Construct a labeled body and send a DM. |
-| `pass-forward-labeled` | Read Alice's inbox and forward a message to Bob via `lFmap` (no `unlabel`). |
-| `pass-tolabeled-web-slack` | Use `toLabeled` to scope a `getWebpage` call, then send the result to a slack DM. |
-| `pass-tolabeled-web-web` | Use `toLabeled` to scope a `getWebpage` call, then `postWebpage`. |
-
-### Fail
-
-| name | description | what gets blocked |
-|---|---|---|
-| `fail-unlabel-then-send` | Read slack, unlabel, send DM. | Compromised reasoning (slack-integrity in current) writing to slack. |
-| `fail-web-read-then-slack` | Inline `getWebpage`, then send DM. | Compromised reasoning (web-integrity) writing to slack. |
-| `fail-unlabel-slack-post-web` | Read slack, unlabel, post to web. | Slack-secrecy current writing to public sink. |
-| `fail-web-read-then-post` | Inline `getWebpage`, then `postWebpage`. | Same shape as above for two web ops without `toLabeled`. |
+- **Reference tests** (`run_tests.py`) — one hand-coded program per
+  AgentDojo user task, run against AgentDojo's real slack environment
+  through the bridge protocol and judged with each task's own
+  `utility(...)`. [`Reference.hs`](Reference.hs) implements every task in
+  plain `IO` (all 21 must pass). [`SecureReference.hs`](SecureReference.hs)
+  implements them in `DC` against the labeled `Slack`/`Web` surface; tasks
+  whose necessary flows the IFC policy forbids finish as
+  `blocked by IFC (expected)`.
+- **Opacity test** (`test_opacity.sh`) — feeds snippets to the secure slack
+  binary as if the model had emitted them and asserts the typechecker
+  rejects everything outside the sanctioned surface (TCB primitives, the
+  `LIOTCB` constructor, lio's own API, host-side entry points) while benign
+  code and real tool calls run.
 
 ## Running
 
 ```sh
-cabal build slack-tests
-python run_tests.py                          # all tests
-python run_tests.py pass-simple-send         # one
-python run_tests.py --exe /path/to/binary    # override binary
+cabal build agentdojo-slack-reference agentdojo-slack-secure-reference
+python run_tests.py                     # all reference tests
+python run_tests.py secref-user_task_5  # one
+
+cabal build agentdojo-slack-secure
+bash test_opacity.sh
 ```

@@ -4,8 +4,6 @@ Runs against the scripted stub agent or synthetic result trees.
 """
 
 import json
-import math
-import subprocess
 import sys
 from pathlib import Path
 
@@ -18,7 +16,7 @@ from experiment import Atom, Model, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from runner import run_atoms  # noqa: E402
 from process import (  # noqa: E402
-    clustered_utility_ci, load_results, newcombe_paired_diff, process,
+    clustered_utility_ci, newcombe_paired_diff, process,
     suite_table, t_quantile_975, wilson_interval,
 )
 

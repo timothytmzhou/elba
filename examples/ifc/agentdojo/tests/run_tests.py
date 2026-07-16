@@ -1,24 +1,18 @@
-"""Driver for the slack IFC tests and reference programs.
+"""Driver for the slack reference programs.
 
-Two flavors of test, run through the same JSONL bridge protocol against
-agentdojo's slack environment:
-
-  IFC tests (slack-tests binary): each test name maps to one DC
-    computation. Pass/fail is decided by the test binary itself; the
-    driver just relays.
-
-  Reference tests (agentdojo-slack-reference binary): one hand-coded
-    `IO String` program per user_task. Pass/fail is decided by calling
-    agentdojo's per-task `utility(...)` / `utility_from_traces(...)`
-    against the env state mutated by the bridge round-trip.
+One hand-coded program per user_task, insecure (`ref-*`, plain IO) and
+secure (`secref-*`, in DC against the labeled surface), run through the
+JSONL bridge protocol against agentdojo's slack environment. Pass/fail is
+decided by calling agentdojo's per-task `utility(...)` /
+`utility_from_traces(...)` against the env state mutated by the bridge
+round-trip; a secure task ending in "blocked by IFC" counts as expected.
 
 Environments come from agentdojo (`get_suite(...).load_and_inject_default_environment({})`);
 they are never hand-written here.
 
 Usage:
     python run_tests.py                            # run all tests
-    python run_tests.py pass-simple-send ...       # run named tests
-    python run_tests.py ref-user_task_5            # filter to a reference
+    python run_tests.py ref-user_task_5            # run named tests
 """
 
 from __future__ import annotations

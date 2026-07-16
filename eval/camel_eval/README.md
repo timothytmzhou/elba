@@ -3,7 +3,7 @@
 The CaMeL comparison runs from a patched clone of
 [google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection)
 at `<repo>/camel` (gitignored). Everything is driven by `eval/run.py`:
-`execute.ensure_camel_checkout` clones and patches automatically, and each
+`camel_eval.ensure_checkout` clones and patches automatically, and each
 CaMeL task evaluation runs as
 
 ```bash
