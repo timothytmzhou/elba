@@ -11,37 +11,33 @@ extra-source-files:
 common suite-app
   default-language: GHC2024
   build-depends:
-    aeson,
     agents,
     base >= 4.20 && < 5,
-    bytestring,
-    containers,
     ifc,
-    lio,
     template-haskell
 
 library
   exposed-modules:
     -- general IFC library and bridge
+    AgentApp
     Bridge
     IFC
     IFCInternal
-    InsecureApp
     Policy
     -- AgentDojo suite bindings
     AgentDojoTypes
+    Banking
+    BankingTCB
     Slack
     SlackLabelTCB
     SlackPrincipal
     SlackTCB
+    Travel
+    TravelTCB
     Web
     WebTCB
-    WorkspaceTCB
     Workspace
-    TravelTCB
-    Travel
-    BankingTCB
-    Banking
+    WorkspaceTCB
 
   hs-source-dirs:
     lib
@@ -108,7 +104,6 @@ executable agentdojo-slack-reference
   hs-source-dirs:   agentdojo/tests
   default-language: GHC2024
   build-depends:
-    agents,
     base >= 4.20 && < 5,
     ifc
 
@@ -117,7 +112,5 @@ executable agentdojo-slack-secure-reference
   hs-source-dirs:   agentdojo/tests
   default-language: GHC2024
   build-depends:
-    agents,
     base >= 4.20 && < 5,
-    ifc,
-    lio
+    ifc

@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- No policy agent app for the slack suite. The driver lives in InsecureApp.
+-- No policy agent app for the slack suite.
 module Main where
 
+import AgentApp (runInsecureAgent)
 import Env (Env (..), defEnv)
-import InsecureApp (runInsecureAgent)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import SlackTCB
 import TH (addTools)
@@ -14,9 +14,11 @@ import WebTCB
 agentEnv :: Env
 agentEnv =
   $( addTools
-       [ ''Body
+       [ -- messages
+         ''Body
        , ''Url
        , ''Message
+         -- values
        , 'getChannels
        , 'addUserToChannel
        , 'readChannelMessages
@@ -28,6 +30,7 @@ agentEnv =
        , 'getUsersInChannel
        , 'getWebpage
        , 'postWebpage
+         -- prompt formatting
        , 'printf
        ]
    )

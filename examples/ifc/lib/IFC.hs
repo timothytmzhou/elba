@@ -4,26 +4,27 @@
 -- so interpreted code can hold and sequence them but cannot unwrap them or
 -- reach the underlying LIO monad.
 module IFC
-  ( DC
-  , DCLabeled
-  , unlabel
-  , toLabeled
-  ) where
+  ( DC,
+    DCLabeled,
+    toLabeled,
+    unlabel,
+  )
+where
 
 import IFCInternal
-  ( DC
-  , DCLabeled
-  , Labeled (LabeledTCB)
-  , LIOState (lioClearance, lioLabel)
-  , cTrue
-  , dcIntegrity
-  , getClearance
-  , getLIOStateTCB
-  , glb
-  , putLIOStateTCB
-  , setClearance
-  , taint
-  , (%%)
+  ( DC,
+    DCLabeled,
+    LIOState (lioClearance, lioLabel),
+    Labeled (LabeledTCB),
+    cTrue,
+    dcIntegrity,
+    getClearance,
+    getLIOStateTCB,
+    glb,
+    putLIOStateTCB,
+    setClearance,
+    taint,
+    (%%),
   )
 
 -- | Runs a computation without tainting the current label.
@@ -33,7 +34,7 @@ toLabeled action = do
   a <- action
   s1 <- getLIOStateTCB
   putLIOStateTCB s1 {lioLabel = lioLabel s0, lioClearance = lioClearance s0}
-  pure (LabeledTCB (lioLabel s1) a)
+  return (LabeledTCB (lioLabel s1) a)
 
 -- | Unlabels a labeled value, tainting the current label and lowering clearance.
 unlabel :: DCLabeled a -> DC a
@@ -41,4 +42,4 @@ unlabel (LabeledTCB l v) = do
   c <- getClearance
   setClearance (c `glb` (dcIntegrity l %% cTrue))
   taint l
-  pure v
+  return v

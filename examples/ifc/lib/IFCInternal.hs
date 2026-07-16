@@ -2,38 +2,44 @@
 {-# LANGUAGE Unsafe #-}
 
 -- Implementation of the IFC monad. DC wraps LIO so the agent facing type is
--- opaque. The primitives below keep the same names as their LIO originals, so
--- policy modules only swap this import for their LIO imports. The constructor
--- and these primitives are never exported to the interpreted agent.
+-- opaque, and its constructor never leaves this module. The primitives below
+-- keep the same names as their LIO originals, so policy modules only swap
+-- this import for their LIO imports.
 module IFCInternal
-  ( DC (..)
-  , evalDC
-  , initialState
-  , LIOState (..)
-  , getLabel
-  , getClearance
-  , setClearance
-  , taint
-  , ioTCB
-  , labelError
-  , unlabelP
-  , getLIOStateTCB
-  , putLIOStateTCB
-  , CNF
-  , DCLabel
-  , DCLabeled
-  , Labeled (LabeledTCB)
-  , Priv (PrivTCB)
-  , cFalse
-  , cTrue
-  , dcPublic
-  , dcIntegrity
-  , speaksFor
-  , toCNF
-  , glb
-  , (%%)
-  , (\/)
-  ) where
+  ( -- the monad and its runner
+    DC,
+    evalDC,
+    initialState,
+
+    -- lifted LIO primitives
+    getLabel,
+    getClearance,
+    setClearance,
+    taint,
+    ioTCB,
+    labelError,
+    unlabelP,
+    getLIOStateTCB,
+    putLIOStateTCB,
+
+    -- label vocabulary re-exported from lio
+    CNF,
+    DCLabel,
+    DCLabeled,
+    LIOState (..),
+    Labeled (LabeledTCB),
+    Priv (PrivTCB),
+    cFalse,
+    cTrue,
+    dcIntegrity,
+    dcPublic,
+    glb,
+    speaksFor,
+    toCNF,
+    (%%),
+    (\/),
+  )
+where
 
 import LIO (LIO, LIOState (..), evalLIO, glb, speaksFor)
 import LIO qualified

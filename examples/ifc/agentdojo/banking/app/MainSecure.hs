@@ -4,17 +4,11 @@
 -- undefined so this builds but fails at run time on the first tool call.
 module Main where
 
-import Agents (mkAgent)
+import AgentApp (runSecureAgent)
 import Banking
-import Bridge (readPrompt, sendDone, sendFailed, withBridge)
-import Control.Exception (SomeException, displayException, try)
 import Env (Env (..), defEnv)
-import IFC (DC, toLabeled, unlabel)
-import IFCInternal (evalDC, initialState)
-import InsecureApp (loadConfig, parseFlag)
-import LLM (Config (..), defaultConfig)
+import IFC (toLabeled, unlabel)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
-import System.Environment (getArgs)
 import TH (addTools)
 import Text.Printf (printf)
 
@@ -36,19 +30,9 @@ agentEnv =
        ]
    )
     defEnv
-      { silentModules = ["IFC"]
-      , extensions = [OverloadedStrings]
+      { extensions = [OverloadedStrings]
+      , silentModules = ["IFC"]
       }
 
 main :: IO ()
-main = do
-  args <- getArgs
-  baseCfg <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
-  withBridge $ do
-    prompt <- readPrompt
-    let cfg = baseCfg {logPath = parseFlag "--log-path" args}
-    let agentExpr = mkAgent cfg agentEnv prompt :: DC String
-    result <- try (evalDC agentExpr initialState) :: IO (Either SomeException String)
-    case result of
-      Right answer -> sendDone answer
-      Left (e :: SomeException) -> sendFailed (displayException e)
+main = runSecureAgent agentEnv id

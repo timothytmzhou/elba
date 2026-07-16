@@ -18,7 +18,7 @@ module Slack
   )
 where
 
-import IFCInternal (DC, DCLabeled, Labeled (LabeledTCB), cFalse, ioTCB, dcIntegrity, getLabel, speaksFor, (%%))
+import IFCInternal (DC, DCLabeled, Labeled (LabeledTCB), cFalse, dcIntegrity, getLabel, ioTCB, speaksFor, (%%))
 import Policy qualified
 import SlackLabelTCB qualified as SL
 import SlackPrincipal

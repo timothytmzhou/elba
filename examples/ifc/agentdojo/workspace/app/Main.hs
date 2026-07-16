@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- No policy agent app for the workspace suite. The driver lives in InsecureApp.
+-- No policy agent app for the workspace suite.
 module Main where
 
+import AgentApp (runInsecureAgent)
 import Env (Env (..), defEnv)
-import InsecureApp (runInsecureAgent)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import TH (addTools)
 import Text.Printf (printf)

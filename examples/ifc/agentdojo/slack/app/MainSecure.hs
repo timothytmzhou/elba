@@ -1,24 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 
--- IFC secured agent app for the slack suite. The agent sees the Slack and
--- Web secured surface plus unlabel, toLabeled, and printf, all with their
--- docstrings. DC and DCLabeled reach the interpreter through silentModules,
--- so the agent can hold them but cannot name or unwrap the internals.
+-- IFC secured agent app for the slack suite. Opaque types stay out of the
+-- tool list. addTools would leak their constructors and their defining
+-- modules are unsafe to import. The agent still sees them in the tool
+-- signatures, with DC and DCLabeled in scope through the silent IFC import.
 module Main where
 
-import Agents (mkAgent)
-import Bridge (readPrompt, sendDone, sendFailed, withBridge)
-import Control.Exception (SomeException, displayException, try)
+import AgentApp (runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (DC, toLabeled, unlabel)
-import IFCInternal (evalDC, initialState)
-import InsecureApp (loadConfig, parseFlag)
-import LLM (Config (..), defaultConfig, defaultSystemPrompt)
+import IFC (toLabeled, unlabel)
+import LLM (Config (..), defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import Language.Haskell.TH.Syntax qualified as TH
 import Slack
-import System.Environment (getArgs)
 import System.FilePath (takeDirectory, (</>))
 import TH (addTools)
 import Text.Printf (printf)
@@ -27,32 +22,40 @@ import Web
 agentEnv :: Env
 agentEnv =
   $( addTools
-       [ ''LabeledMessage
-       , 'getChannels
-       , 'readChannelMessages
-       , 'readInbox
-       , 'getUsersInChannel
+       [ -- Slack types
+         ''LabeledMessage
+         -- Slack ids
        , 'channelName
        , 'userName
        , 'channelID
        , 'userID
+         -- Slack reads
+       , 'getChannels
+       , 'readChannelMessages
+       , 'readInbox
+       , 'getUsersInChannel
+         -- Slack writes
        , 'addUserToChannel
        , 'inviteUserToSlack
        , 'removeUserFromSlack
        , 'sendDirectMessage
        , 'sendChannelMessage
+         -- Web tools
        , 'getWebpage
        , 'postWebpage
+         -- IFC API
        , 'unlabel
        , 'toLabeled
+         -- prompt formatting
        , 'printf
        ]
    )
     defEnv
-      { silentModules = ["IFC"]
-      , extensions = [OverloadedStrings]
+      { extensions = [OverloadedStrings]
+      , silentModules = ["IFC"]
       }
 
+-- Information-flow guidance appended to the default system prompt.
 ifcGuidance :: String
 ifcGuidance =
   $( do
@@ -64,17 +67,6 @@ ifcGuidance =
    )
 
 main :: IO ()
-main = do
-  args <- getArgs
-  baseCfg <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
-  withBridge $ do
-    prompt <- readPrompt
-    let cfg = baseCfg
-          { logPath = parseFlag "--log-path" args
-          , systemPrompt = defaultSystemPrompt ++ "\n" ++ ifcGuidance
-          }
-    let agentExpr = mkAgent cfg agentEnv prompt :: DC String
-    result <- try (evalDC agentExpr initialState) :: IO (Either SomeException String)
-    case result of
-      Right answer -> sendDone answer
-      Left (e :: SomeException) -> sendFailed (displayException e)
+main = runSecureAgent agentEnv withGuidance
+  where
+    withGuidance cfg = cfg {systemPrompt = defaultSystemPrompt ++ "\n" ++ ifcGuidance}
