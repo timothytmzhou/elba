@@ -7,7 +7,6 @@
 module AgentApp
   ( runInsecureAgent
   , runSecureAgent
-  , initialState
   ) where
 
 import Agents (mkAgent)
@@ -17,16 +16,11 @@ import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import qualified Data.ByteString.Lazy as BL
 import Env (Env (..))
-import IFC (DC)
-import LIO (LIOState (..), evalLIO)
-import LIO.DCLabel (DCLabel, cFalse, cTrue, (%%))
+import IFC (DC, runDC)
 import LLM (Config (..), defaultConfig)
 import System.Environment (getArgs)
 
 $(deriveFromJSON defaultOptions ''Config)
-
-initialState :: LIOState DCLabel
-initialState = LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
 parseFlag :: String -> [String] -> Maybe FilePath
 parseFlag flag (a : v : _) | a == flag = Just v
@@ -62,5 +56,5 @@ runInsecureAgent env = runAgentWith (\cfg prompt -> mkAgent cfg env prompt) id
 runSecureAgent :: Env -> (Config -> Config) -> IO ()
 runSecureAgent env = runAgentWith run
   where
-    run cfg prompt = evalLIO (mkAgent cfg aliased prompt :: DC String) initialState
+    run cfg prompt = runDC (mkAgent cfg aliased prompt :: DC String)
     aliased = env {typeAliases = [("LIO DCLabel", "DC")]}

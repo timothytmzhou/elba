@@ -14,7 +14,7 @@ import GHC.IO (unsafePerformIO)
 import LLM
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
-import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
+import Language.Haskell.Interpreter.Unsafe (unsafeInterpret, unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
 
 buildContext :: forall a. (Typeable a) => Proxy a -> [(String, String)] -> TypeEnv -> String -> String
@@ -91,10 +91,13 @@ mkAgent config env userPrompt = unsafePerformIO $
   where
     baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
+    -- The interpreter checks against the aliased spelling, so only the
+    -- alias targets need to be in scope, not their expansions.
+    wrapperType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy (Config -> Env -> a))))
 
     runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
     runAttempt lg ask code attempt = do
-      result <- try (interpret (wrapper code) (as :: Config -> Env -> a))
+      result <- try (unsafeInterpret (wrapper code) wrapperType)
       case result of
         Right f -> do
           liftIO (logEvent lg Success)

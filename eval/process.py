@@ -118,6 +118,7 @@ def load_results(logdir: Path, models: dict[str, Model]) -> list[dict]:
                         "attack": path.parts[-2], "injection_task": path.stem,
                         "utility": r["utility"], "security": r["security"],
                         "duration_s": r.get("duration"), "tokens": r.get("tokens"),
+                        "timestamp": r.get("evaluation_timestamp"),
                         "error": r.get("error"), "final_output": final,
                         "messages": r.get("messages") or [],
                         "agent_transcript": r.get("agent_transcript"), "result_file": str(path),

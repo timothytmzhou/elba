@@ -57,7 +57,9 @@ agentEnv =
    )
     defEnv
       { extensions = [OverloadedStrings]
-      , silentModules = ["IFC"]
+      , -- brings the opaque ChannelID and UserID types into scope so tool
+        -- signatures render them unqualified and annotations typecheck
+        silentModules = ["SlackPrincipal"]
       }
 
 -- Information-flow guidance appended to the default system prompt.

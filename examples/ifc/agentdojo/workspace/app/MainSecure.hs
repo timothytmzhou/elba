@@ -6,7 +6,7 @@ module Main where
 
 import AgentApp (runSecureAgent)
 import Env (Env (..), defEnv)
-import IFC (toLabeled, unlabel)
+import IFC (DC, DCLabeled, toLabeled, unlabel)
 import Language.Haskell.TH.Syntax (Extension (OverloadedStrings))
 import TH (addTools)
 import Text.Printf (printf)
@@ -15,7 +15,9 @@ import Workspace
 agentEnv :: Env
 agentEnv =
   $( addTools
-       [ ''Email
+       [ ''DC
+       , ''DCLabeled
+       , ''Email
        , ''EmailContact
        , ''CalendarEvent
        , ''CloudDriveFile
@@ -36,10 +38,7 @@ agentEnv =
        , 'printf
        ]
    )
-    defEnv
-      { extensions = [OverloadedStrings]
-      , silentModules = ["IFC"]
-      }
+    defEnv {extensions = [OverloadedStrings]}
 
 main :: IO ()
 main = runSecureAgent agentEnv id
