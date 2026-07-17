@@ -177,6 +177,9 @@ def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
              else f"assuming {per_task['input'] // 1000}k in and {per_task['output'] // 1000}k out per task")
     cost = 0.0
     for b in benchmarks:
+        # camel policy replays the recorded run and costs no LLM calls
+        if b.system == "camel" and b.variant == "policy":
+            continue
         price = price_for(models[b.model].camel_model, pricing)
         mult = CAMEL_TOKEN_MULTIPLIER if b.system == "camel" else 1.0
         cost += mult * (per_task["input"] / 1e6 * price["input"]
