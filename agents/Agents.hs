@@ -130,9 +130,8 @@ setupInterp env = do
   set [searchPath := []]
   set [languageExtensions := map (Hint.UnknownExtension . show) (extensions env)]
 
--- The running agent's context for subagent. The interpreter loads its own
--- copy of this module, so mkAgent seeds that copy's slot through the
--- setContext handshake before running any code.
+-- The interpreter loads its own copy of this module, so mkAgent seeds that
+-- copy's slot through the setContext handshake before running any code.
 {-# NOINLINE contextRef #-}
 contextRef :: IORef (Config, Env)
 contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run"))

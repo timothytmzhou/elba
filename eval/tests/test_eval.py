@@ -155,9 +155,7 @@ def test_processing_outputs(slack_run):
 
 
 def test_subagent_recursion(tmp_path, agent_exe, mock_llm):
-    # The parent emission delegates to a subagent, whose own emission
-    # answers. Exercises the recursive mkAgent path where the resolved
-    # tools ride along in the Env instead of resolving again.
+    # The parent emission delegates to a subagent whose own emission answers.
     count = tmp_path / "calls"
     mock_llm(f"""N=$(cat {count} 2>/dev/null || echo 0)
 echo $((N+1)) > {count}

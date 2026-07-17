@@ -50,7 +50,7 @@ import Data.Aeson
   )
 
 ----------------------------------------------------------------
--- Read types, shared with the travel suite (email + calendar).
+-- Read types shared with the travel suite.
 ----------------------------------------------------------------
 
 -- | Opaque email id (a stringly id in AgentDojo, e.g. "0").

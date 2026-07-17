@@ -1,9 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | The agent binary for every AgentDojo suite.
---
---     agentdojo --suite slack [--secure] [--config cfg.json] [--log-path log]
+-- The agent binary for every AgentDojo suite.
+-- agentdojo --suite slack [--secure] [--config cfg.json] [--log-path log]
 module Main where
 
 import Agents (mkAgent)
@@ -65,8 +64,8 @@ main = do
         defEnv
           { modules = if secure then secureMods else insecureMods
           , extensions = [OverloadedStrings]
-          , -- the alias keeps the required type spelled DC where TypeRep
-            -- rendering would expand the synonym
+          , -- The alias keeps the required type spelled DC where TypeRep
+            -- rendering would expand the synonym.
             typeAliases = [("LIO DCLabel", "DC") | secure]
           }
   loaded <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
