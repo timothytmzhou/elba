@@ -5,6 +5,7 @@ Runs against the scripted stub agent or synthetic result trees.
 
 import json
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -12,9 +13,9 @@ import pytest
 EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
-from experiment import Atom, Model, expand, split_cached  # noqa: E402
+from benchmark import Benchmark, Model, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
-from runner import run_atoms  # noqa: E402
+from run import run_benchmarks  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 
 
@@ -51,8 +52,8 @@ def test_pipeline_names_match_camel_convention():
 def test_split_cached(tmp_path):
     m = model()
     models = {m.name: m}
-    a1 = Atom("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    a2 = Atom("typeguard", "policy", m.name, 1, "slack", "user_task_1")
+    a1 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
+    a2 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_1")
     p = a1.result_path(tmp_path, models)
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps({"utility": True, "security": True}))
@@ -80,6 +81,18 @@ def test_to_jsonable_handles_agentdojo_types():
     assert "2026-05-26T10:00:00" in encoded
 
 
+@contextmanager
+def fake_exes(exe: str):
+    import run
+    orig = run.resolve_typeguard_exes
+    run.resolve_typeguard_exes = lambda benchmarks, build=True: {
+        "agentdojo-slack-secure": exe, "agentdojo-slack": exe}
+    try:
+        yield
+    finally:
+        run.resolve_typeguard_exes = orig
+
+
 def stub_exe(tmp_path: Path, actions: list[dict]) -> str:
     # Wrap the stub so it reads our action script.
     script = tmp_path / "actions.json"
@@ -101,21 +114,15 @@ def slack_run(tmp_path):
         {"call": "get_webpage", "args": {"url": "www.informations.com"}},
         {"done": "I read the page."},
     ])
-    atoms = [
-        Atom("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
-        Atom("typeguard", "policy", m.name, 1, "slack", "user_task_0",
-             attack="important_instructions", injection_task_id="injection_task_1"),
+    benchmarks = [
+        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
+        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
+                  attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
-    import runner
-    orig = runner.resolve_typeguard_exes
-    runner.resolve_typeguard_exes = lambda atoms, build=True: {
-        "agentdojo-slack-secure": exe, "agentdojo-slack": exe}
-    try:
-        report = run_atoms(atoms, models, logdir, "v1.2.2", timeout_s=60,
-                           max_workers=2, build=False)
-    finally:
-        runner.resolve_typeguard_exes = orig
+    with fake_exes(exe):
+        report = run_benchmarks(benchmarks, models, logdir, "v1.2.2", timeout_s=60,
+                                max_workers=2, build=False)
     return models, logdir, report
 
 
@@ -153,16 +160,11 @@ def test_timeout_writes_failure(tmp_path):
     m = model()
     models = {m.name: m}
     exe = stub_exe(tmp_path, [{"sleep": 60}, {"done": "too late"}])
-    atom = Atom("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    import runner
-    orig = runner.resolve_typeguard_exes
-    runner.resolve_typeguard_exes = lambda atoms, build=True: {"agentdojo-slack-secure": exe}
-    try:
-        report = run_atoms([atom], models, tmp_path / "logs", "v1.2.2",
-                           timeout_s=3, max_workers=1, build=False)
-    finally:
-        runner.resolve_typeguard_exes = orig
-    result = json.loads(atom.result_path(tmp_path / "logs", models).read_text())
+    bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
+    with fake_exes(exe):
+        report = run_benchmarks([bench], models, tmp_path / "logs", "v1.2.2",
+                                timeout_s=3, max_workers=1, build=False)
+    result = json.loads(bench.result_path(tmp_path / "logs", models).read_text())
     assert result["utility"] is False
     assert report["completed"] + report["timeout"] == 1
 
@@ -172,7 +174,7 @@ def test_suite_table_full_matrix(tmp_path):
     models = {m.name: m}
     attacks = ["direct", "important_instructions"]
     records = []
-    from experiment import suite_tasks
+    from benchmark import suite_tasks
     user_tasks, injection_tasks = suite_tasks("slack")
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:

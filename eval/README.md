@@ -38,16 +38,15 @@ A plain-text summary of the same numbers is also printed to the terminal.
 
 ## Structure
 
-Running and processing are separate; `run.py` chains them.
+Running and processing are separate modules; `run.py` chains them.
 
 ```
-run.py         the small user-facing command (--plan-only / --process-only)
-experiment.py  what to run: model configs, run matrix, plan + cost estimate
-bridge.py      run one AgentDojo task through the Haskell agent binary
-runner.py      launch every atom in parallel with per-task timeouts
-process.py     data processing: dump.jsonl, statistics, LaTeX tables
+run.py         the CLI plus run_benchmark (one worker) and run_benchmarks
+benchmark.py   what to run: model configs, run matrix, plan + cost estimate
+bridge.py      the JSON protocol spoken with a Haskell agent binary
+process.py     data processing: dump.jsonl, the Newcombe CIs, LaTeX tables
 configs/       one JSON per model — pass any subset via --models
-camel_eval/    self-contained CaMeL baseline (checkout, patch, worker)
+camel_eval/    self-contained CaMeL baseline (checkout, diff, worker)
 stub_agent.py  scripted fake agent; lets tests run the whole pipeline
 tests/         pytest suite, no LLM calls:  python -m pytest eval/tests
 ```
@@ -73,7 +72,7 @@ minutes (`--timeout`), as in the paper; timed-out tasks are recorded as
 | repeats | `--repeats k` (default 1 = pass@1)                                 |
 
 TypeGuard's `policy` variant only runs on suites whose IFC policies exist —
-currently slack (`experiment.TYPEGUARD_POLICY_SUITES`). The other suites'
+currently slack (`benchmark.TYPEGUARD_POLICY_SUITES`). The other suites'
 secure surfaces are `undefined` placeholders to be written by hand
 (`examples/ifc/agentdojo/{workspace,travel,banking}/<Suite>.hs`); their
 no-policy variants run everywhere. CaMeL ships policies for all four suites.

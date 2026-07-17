@@ -1,7 +1,7 @@
 """The run matrix and the upfront plan.
 
-An atom is one AgentDojo task evaluation. Atoms are independent so the eval
-is embarrassingly parallel. Results land at
+A Benchmark is one AgentDojo task evaluation. Benchmarks are independent so
+the eval is embarrassingly parallel. Results land at
 
     <logdir>/rep<r>/<pipeline>/<suite>/<task>/<attack>/<injection>.json
 
@@ -61,7 +61,7 @@ class Model:
 
 
 @dataclass(frozen=True)
-class Atom:
+class Benchmark:
     system: str
     variant: str
     model: str
@@ -88,26 +88,22 @@ def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):
     return list(s.user_tasks.keys()), list(s.injection_tasks.keys())
 
 
-def variants(system: str, suite: str) -> list[str]:
-    if system == "typeguard" and suite not in TYPEGUARD_POLICY_SUITES:
-        return ["nopolicy"]
-    return ["policy", "nopolicy"]
-
-
-def expand(models, suites, attacks, repeats, systems=("typeguard", "camel")) -> list[Atom]:
-    atoms = []
+def expand(models, suites, attacks, repeats, systems=("typeguard", "camel")) -> list[Benchmark]:
+    benchmarks = []
     for suite in suites:
         user_tasks, injection_tasks = suite_tasks(suite)
         for model in models:
             for system in systems:
-                for variant in variants(system, suite):
+                variants = (["nopolicy"] if system == "typeguard"
+                            and suite not in TYPEGUARD_POLICY_SUITES else ["policy", "nopolicy"])
+                for variant in variants:
                     for rep in range(1, repeats + 1):
                         base = dict(system=system, variant=variant, model=model.name,
                                     rep=rep, suite=suite)
-                        atoms += [Atom(task_id=ut, **base) for ut in user_tasks]
-                        atoms += [Atom(task_id=ut, attack=a, injection_task_id=it, **base)
-                                  for a in attacks for ut in user_tasks for it in injection_tasks]
-    return atoms
+                        benchmarks += [Benchmark(task_id=ut, **base) for ut in user_tasks]
+                        benchmarks += [Benchmark(task_id=ut, attack=a, injection_task_id=it, **base)
+                                       for a in attacks for ut in user_tasks for it in injection_tasks]
+    return benchmarks
 
 
 def is_finalized(path: Path) -> bool:
@@ -117,10 +113,10 @@ def is_finalized(path: Path) -> bool:
         return False
 
 
-def split_cached(atoms, logdir, models):
-    cached = [a for a in atoms if is_finalized(a.result_path(logdir, models))]
+def split_cached(benchmarks, logdir, models):
+    cached = [b for b in benchmarks if is_finalized(b.result_path(logdir, models))]
     done = set(cached)
-    return [a for a in atoms if a not in done], cached
+    return [b for b in benchmarks if b not in done], cached
 
 
 PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -173,24 +169,24 @@ def measured_tokens_per_task(logdir: Path) -> dict | None:
     return {"input": total["input"] // n, "output": total["output"] // n, "samples": n}
 
 
-def estimate_cost(atoms, models, logdir) -> tuple[float, str]:
+def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
     pricing = load_pricing()
     measured = measured_tokens_per_task(logdir)
     per_task = measured or DEFAULT_TOKENS_PER_TASK
     basis = (f"measured over {measured['samples']} tasks" if measured
              else f"assuming {per_task['input'] // 1000}k in and {per_task['output'] // 1000}k out per task")
     cost = 0.0
-    for atom in atoms:
-        price = price_for(models[atom.model].camel_model, pricing)
-        mult = CAMEL_TOKEN_MULTIPLIER if atom.system == "camel" else 1.0
+    for b in benchmarks:
+        price = price_for(models[b.model].camel_model, pricing)
+        mult = CAMEL_TOKEN_MULTIPLIER if b.system == "camel" else 1.0
         cost += mult * (per_task["input"] / 1e6 * price["input"]
                         + per_task["output"] / 1e6 * price["output"])
     return cost, f"{basis}. prices from {pricing['source']} retrieved {pricing['retrieved']}"
 
 
 def print_plan(to_run, cached, models, logdir, max_workers) -> None:
-    counts = Counter((a.model, a.system, a.variant, a.suite, "benign" if a.benign else "attack")
-                     for a in to_run)
+    counts = Counter((b.model, b.system, b.variant, b.suite, "benign" if b.benign else "attack")
+                     for b in to_run)
     header = f"{'model':<16}{'system':<11}{'variant':<10}{'suite':<11}{'benign':>7}{'attack':>7}"
     print("\n=== Run plan ===", header, "-" * len(header), sep="\n")
     for model, system, variant, suite in sorted({k[:4] for k in counts}):

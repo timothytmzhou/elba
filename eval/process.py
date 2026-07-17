@@ -15,7 +15,7 @@ from pathlib import Path
 
 from scipy.stats import binomtest
 
-from experiment import BENIGN, Model, suite_tasks
+from benchmark import BENIGN, Model, suite_tasks
 
 SYSTEM_LABELS = {
     ("typeguard", "policy"): "TypeGuard",
