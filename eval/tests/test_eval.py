@@ -1,11 +1,13 @@
 """Tests of the eval infrastructure with no LLM calls.
 
-Runs against the scripted stub agent or synthetic result trees.
+The end-to-end tests run the real agent binary and interpreter, with a
+scripted stand in for the llm CLI placed first on PATH.
 """
 
 import json
+import os
+import subprocess
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -15,7 +17,7 @@ sys.path.insert(0, str(EVAL_DIR))
 
 from benchmark import Benchmark, Model, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
-from run import run_benchmarks  # noqa: E402
+from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 
 
@@ -81,48 +83,44 @@ def test_to_jsonable_handles_agentdojo_types():
     assert "2026-05-26T10:00:00" in encoded
 
 
-@contextmanager
-def fake_exes(exe: str):
-    import run
-    orig = run.resolve_typeguard_exes
-    run.resolve_typeguard_exes = lambda benchmarks, build=True: {
-        "agentdojo-slack-secure": exe, "agentdojo-slack": exe}
+# The vetted secure program for slack user_task_0 from the reference tests.
+PROGRAM = 'do { _ <- getWebpage "www.informations.com"; return "I read the page." }'
+
+
+@pytest.fixture(scope="session")
+def agent_exe():
     try:
-        yield
-    finally:
-        run.resolve_typeguard_exes = orig
-
-
-def stub_exe(tmp_path: Path, actions: list[dict]) -> str:
-    # Wrap the stub so it reads our action script.
-    script = tmp_path / "actions.json"
-    script.write_text(json.dumps({"actions": actions}))
-    wrapper = tmp_path / "stub.sh"
-    wrapper.write_text(f"#!/bin/bash\nexec {sys.executable} "
-                       f"{EVAL_DIR / 'stub_agent.py'} --config {script} "
-                       '--log-path "${4:-/dev/null}"\n')
-    wrapper.chmod(0o755)
-    return str(wrapper)
+        return typeguard_exe()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pytest.skip("the agentdojo binary cannot be built here")
 
 
 @pytest.fixture()
-def slack_run(tmp_path):
-    # Run benign and attacked slack atoms through the real runner.
+def mock_llm(tmp_path, monkeypatch):
+    # Writes a scripted llm CLI and puts it first on PATH for the workers.
+    def script(body: str) -> None:
+        exe = tmp_path / "bin" / "llm"
+        exe.parent.mkdir(exist_ok=True)
+        exe.write_text(f"#!/bin/bash\ncat > /dev/null\n{body}\n")
+        exe.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{exe.parent}:{os.environ['PATH']}")
+    return script
+
+
+@pytest.fixture()
+def slack_run(tmp_path, agent_exe, mock_llm):
+    # Run benign and attacked slack benchmarks through the real runner.
     m = model()
     models = {m.name: m}
-    exe = stub_exe(tmp_path, [
-        {"call": "get_webpage", "args": {"url": "www.informations.com"}},
-        {"done": "I read the page."},
-    ])
+    mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE")
     benchmarks = [
         Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
         Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
                   attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
-    with fake_exes(exe):
-        report = run_benchmarks(benchmarks, models, logdir, "v1.2.2", timeout_s=60,
-                                max_workers=2, build=False)
+    report = run_benchmarks(benchmarks, models, logdir, "v1.2.2", timeout_s=300,
+                            max_workers=2, build=False)
     return models, logdir, report
 
 
@@ -156,14 +154,13 @@ def test_processing_outputs(slack_run):
     assert " & 1/1 " in tex
 
 
-def test_timeout_writes_failure(tmp_path):
+def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     m = model()
     models = {m.name: m}
-    exe = stub_exe(tmp_path, [{"sleep": 60}, {"done": "too late"}])
+    mock_llm("sleep 60")
     bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    with fake_exes(exe):
-        report = run_benchmarks([bench], models, tmp_path / "logs", "v1.2.2",
-                                timeout_s=3, max_workers=1, build=False)
+    report = run_benchmarks([bench], models, tmp_path / "logs", "v1.2.2",
+                            timeout_s=5, max_workers=1, build=False)
     result = json.loads(bench.result_path(tmp_path / "logs", models).read_text())
     assert result["utility"] is False
     assert report["timeout"] == 1

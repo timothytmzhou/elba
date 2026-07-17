@@ -47,13 +47,14 @@ bridge.py      the JSON protocol spoken with a Haskell agent binary
 process.py     data processing: dump.jsonl, the Newcombe CIs, LaTeX tables
 configs/       one JSON per model — pass any subset via --models
 camel_eval/    self-contained CaMeL baseline (pristine checkout, worker)
-stub_agent.py  scripted fake agent; lets tests run the whole pipeline
 tests/         pytest suite, no LLM calls:  python -m pytest eval/tests
 ```
 
-Each suite's agent apps live in `examples/ifc/agentdojo/<suite>/app/`. An
-app declares its tool modules in the `Env` and the agent sees every export
-with its Haddock docstring in the prompt.
+One binary serves every suite: `agentdojo --suite slack [--secure]`
+(`examples/ifc/agentdojo/app/Main.hs`). It declares each suite's tool
+modules in the `Env` and the agent sees every export with its Haddock
+docstring — AgentDojo's own tool docs — in the prompt. The tests run this
+real binary end to end, standing in a scripted `llm` CLI for the model.
 
 ## The run matrix
 
@@ -98,7 +99,7 @@ Drop a JSON into `configs/`:
 
 ## Prerequisites
 
-- GHC/cabal (the runner builds the `agentdojo-<suite>` binaries itself);
+- GHC/cabal (the runner builds the `agentdojo` binary itself);
   the `llm` CLI with a stored OpenAI key (`llm keys set openai`) or
   `OPENAI_API_KEY` in the environment. Each parallel agent gets a private
   `llm` state dir, which is also where token counts are measured from.

@@ -1,6 +1,6 @@
 module Main where
 
-import AgentApp (runDC)
+import Policy (runDC)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (when, zipWithM_)

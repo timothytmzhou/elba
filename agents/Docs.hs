@@ -35,8 +35,9 @@ data ResolvedTool = ResolvedTool
     toolDoc :: Maybe String
   }
 
--- Subagents reuse their parent's Env, so caching keeps recursive mkAgent
--- calls from opening a second GHC session inside a live interpreter.
+-- Interpreted agent code can spawn a subagent, which reuses the parent Env.
+-- The cache turns that resolveTools call into a map lookup, so a second GHC
+-- session never opens inside the hint session running the code.
 {-# NOINLINE cache #-}
 cache :: IORef (Map [String] [ResolvedTool])
 cache = unsafePerformIO (newIORef Map.empty)

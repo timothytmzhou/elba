@@ -32,8 +32,8 @@ def to_jsonable(obj):
 class HaskellAgentPipeline:
     """AgentDojo pipeline element that runs one agent binary per query."""
 
-    def __init__(self, exe, name, config_path, log_path, llm_user_dir):
-        self.exe, self.name = exe, name
+    def __init__(self, cmd, name, config_path, log_path, llm_user_dir):
+        self.cmd, self.name = cmd, name
         self.config_path, self.log_path = config_path, log_path
         self.llm_user_dir = llm_user_dir
 
@@ -58,7 +58,7 @@ class HaskellAgentPipeline:
 
         env = env if env is not None else EmptyEnv()
         proc = subprocess.Popen(
-            [self.exe, "--config", self.config_path, "--log-path", self.log_path],
+            [*self.cmd, "--config", self.config_path, "--log-path", self.log_path],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1,
             env=self._child_env())
         tool_calls = []

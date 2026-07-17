@@ -8,22 +8,13 @@ build-type:    Simple
 extra-source-files:
   agentdojo/IfcGuidance.md
 
-common suite-app
-  default-language: GHC2024
-  build-depends:
-    agents,
-    base >= 4.20 && < 5,
-    ifc
-
 library
   exposed-modules:
     -- general IFC library and bridge
-    AgentApp
     Bridge
     IFC
     Policy
     -- AgentDojo suite bindings
-    AgentDojoTypes
     Banking
     BankingTCB
     Slack
@@ -53,51 +44,20 @@ library
     bytestring,
     containers,
     lio,
-    template-haskell,
     text
 
-executable agentdojo-slack
-  import:           suite-app
+executable agentdojo
   main-is:          Main.hs
-  hs-source-dirs:   agentdojo/slack/app
-
-executable agentdojo-slack-secure
-  import:           suite-app
-  main-is:          MainSecure.hs
-  hs-source-dirs:   agentdojo/slack/app
+  hs-source-dirs:   agentdojo/app
+  default-language: GHC2024
   build-depends:
+    aeson,
+    agents,
+    base >= 4.20 && < 5,
+    bytestring,
     filepath,
+    ifc,
     template-haskell
-
-executable agentdojo-workspace
-  import:           suite-app
-  main-is:          Main.hs
-  hs-source-dirs:   agentdojo/workspace/app
-
-executable agentdojo-workspace-secure
-  import:           suite-app
-  main-is:          MainSecure.hs
-  hs-source-dirs:   agentdojo/workspace/app
-
-executable agentdojo-travel
-  import:           suite-app
-  main-is:          Main.hs
-  hs-source-dirs:   agentdojo/travel/app
-
-executable agentdojo-travel-secure
-  import:           suite-app
-  main-is:          MainSecure.hs
-  hs-source-dirs:   agentdojo/travel/app
-
-executable agentdojo-banking
-  import:           suite-app
-  main-is:          Main.hs
-  hs-source-dirs:   agentdojo/banking/app
-
-executable agentdojo-banking-secure
-  import:           suite-app
-  main-is:          MainSecure.hs
-  hs-source-dirs:   agentdojo/banking/app
 
 executable agentdojo-slack-reference
   main-is:          Reference.hs

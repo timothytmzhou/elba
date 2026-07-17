@@ -42,7 +42,7 @@ module Travel
   , sendEmail
   ) where
 
-import AgentDojoTypes (CalendarEvent, Email)
+import WorkspaceTCB (CalendarEvent, Email)
 import Data.Map (Map)
 import IFC (DC, DCLabeled)
 

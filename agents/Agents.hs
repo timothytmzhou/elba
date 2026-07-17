@@ -78,12 +78,12 @@ parenIfOp :: String -> String
 parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
 parenIfOp s = s
 
-buildContext :: forall a. (Typeable a) => Proxy a -> [(String, String)] -> TypeEnv -> String -> String
-buildContext proxy aliases typeEnv task =
+buildContext :: String -> TypeEnv -> String -> String
+buildContext reqType typeEnv task =
   unlines
     [ task
     , ""
-    , "Required type: " ++ applyAliases aliases (show (typeRep proxy))
+    , "Required type: " ++ reqType
     , "Allowed functions: " ++ show typeEnv
     ]
 
@@ -136,7 +136,7 @@ mkAgent config env userPrompt = unsafePerformIO $
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
       typeEnv <- setEnv env tools
-      let ctx = buildContext (Proxy :: Proxy a) (typeAliases env) typeEnv userPrompt
+      let ctx = buildContext requiredType typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
       liftIO (logEvent lg (Response code))
@@ -147,7 +147,7 @@ mkAgent config env userPrompt = unsafePerformIO $
   where
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
     -- Checked against the aliased spelling so only alias targets need scope.
-    wrapperType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy (Config -> Env -> a))))
+    wrapperType = "Config -> Env -> " ++ requiredType
 
     runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
     runAttempt lg ask code attempt = do

@@ -110,20 +110,15 @@ def run_benchmark(spec: dict) -> None:
     print(f"[done] {slug}", flush=True)
 
 
-def resolve_typeguard_exes(benchmarks: list[Benchmark], build: bool = True) -> dict[str, str]:
-    targets = sorted({_target(b) for b in benchmarks if b.system == "typeguard"})
-    if targets and build:
-        subprocess.run(["cabal", "build", "--write-ghc-environment-files=always", *targets],
+def typeguard_exe(build: bool = True) -> str:
+    if build:
+        subprocess.run(["cabal", "build", "--write-ghc-environment-files=always", "agentdojo"],
                        cwd=REPO_ROOT, check=True)
-    return {t: subprocess.check_output(["cabal", "list-bin", t], cwd=REPO_ROOT,
-                                       text=True).strip().splitlines()[-1] for t in targets}
+    return subprocess.check_output(["cabal", "list-bin", "agentdojo"], cwd=REPO_ROOT,
+                                   text=True).strip().splitlines()[-1]
 
 
-def _target(bench: Benchmark) -> str:
-    return f"agentdojo-{bench.suite}" + ("-secure" if bench.variant == "policy" else "")
-
-
-def _spec(bench, model, logdir, benchmark_version, exes) -> dict:
+def _spec(bench, model, logdir, benchmark_version, exe) -> dict:
     spec = {
         "suite": bench.suite, "task_id": bench.task_id, "attack": bench.attack,
         "injection_task_id": bench.injection_task_id, "variant": bench.variant,
@@ -132,7 +127,8 @@ def _spec(bench, model, logdir, benchmark_version, exes) -> dict:
     }
     spec |= {"attack_model_name": model.attack_model_name}
     if bench.system == "typeguard":
-        spec |= {"exe": exes[_target(bench)], "agent_config": model.agent_config}
+        cmd = [exe, "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
+        spec |= {"exe": cmd, "agent_config": model.agent_config}
     else:
         spec |= {"camel_model": model.camel_model,
                  "reasoning_effort": model.agent_config.get("reasoningEffort")}
@@ -149,14 +145,14 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
                    build: bool = True) -> dict:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
-    exes = resolve_typeguard_exes(benchmarks, build=build)
+    exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
     done = {"completed": 0, "timeout": 0, "crashed": []}
     lock = threading.Lock()
     start = time.time()
 
     def run_one(bench: Benchmark) -> None:
-        spec = _spec(bench, models[bench.model], logdir, benchmark_version, exes)
+        spec = _spec(bench, models[bench.model], logdir, benchmark_version, exe)
         result_path = bench.result_path(logdir, models)
         slug = f"{spec['pipeline_name']}-{bench.rep}-{bench.suite}-{bench.task_id}-{bench.attack}-{bench.injection_task_id}"
         log = logdir / ".workers" / f"{slug}.log"

@@ -36,7 +36,7 @@ module Workspace
   , shareFile
   ) where
 
-import AgentDojoTypes (CalendarEvent, CloudDriveFile, CloudFileId, Email, EmailContact)
+import WorkspaceTCB (CalendarEvent, CloudDriveFile, CloudFileId, Email, EmailContact)
 import IFC (DC, DCLabeled)
 
 getUnreadEmails :: DC (DCLabeled [Email])
