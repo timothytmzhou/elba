@@ -51,7 +51,7 @@ defaultConfig = Config
   , systemPrompt    = defaultSystemPrompt
   , logPath         = Nothing
   , maxAttempts     = 3
-  , maxDepth        = 7
+  , maxDepth        = 10
   }
 
 toArgs :: Config -> [String]

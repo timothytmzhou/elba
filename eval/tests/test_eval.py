@@ -25,7 +25,7 @@ def model(name="gpt-5.4-high") -> Model:
     return Model(
         name=name, display="GPT-5.4 (high)",
         agent_config={"modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0,
-                      "systemPrompt": "", "maxAttempts": 3, "maxDepth": 7},
+                      "systemPrompt": "", "maxAttempts": 3, "maxDepth": 10},
         camel_model="openai:gpt-5.4-2026-03-05", camel_reasoning=True,
         attack_model_name="ChatGPT",
     )

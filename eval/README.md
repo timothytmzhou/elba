@@ -90,7 +90,7 @@ Drop a JSON into `configs/`:
   "camel_model": "openai:gpt-5.4-2026-03-05",
   "camel_reasoning": true,
   "agent_config": { "modelName": "gpt-5.4", "reasoningEffort": "high",
-                    "seed": 0, "systemPrompt": "", "maxAttempts": 3, "maxDepth": 7 }
+                    "seed": 0, "systemPrompt": "", "maxAttempts": 3, "maxDepth": 10 }
 }
 ```
 

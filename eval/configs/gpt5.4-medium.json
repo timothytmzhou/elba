@@ -10,6 +10,6 @@
     "seed": 0,
     "systemPrompt": "",
     "maxAttempts": 3,
-    "maxDepth": 7
+    "maxDepth": 10
   }
 }
