@@ -25,7 +25,7 @@ def model(name="gpt-5.4-high") -> Model:
         agent_config={"modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0,
                       "systemPrompt": "", "maxAttempts": 3, "maxDepth": 7},
         camel_model="openai:gpt-5.4-2026-03-05", camel_reasoning=True,
-        attack_model_name="AI assistant",
+        attack_model_name="ChatGPT",
     )
 
 
@@ -44,8 +44,8 @@ def test_expand_nonslack_has_no_typeguard_policy():
 
 def test_pipeline_names_match_camel_convention():
     m = model()
-    assert m.pipeline_name("camel", "policy") == "gpt-5.4-2026-03-05-high+camel"
-    assert m.pipeline_name("camel", "nopolicy") == "gpt-5.4-2026-03-05-high+camel-nopolicy"
+    assert m.pipeline_name("camel", "policy") == "gpt-5.4-2026-03-05-high+camel+secpol"
+    assert m.pipeline_name("camel", "nopolicy") == "gpt-5.4-2026-03-05-high+camel"
     assert m.pipeline_name("typeguard", "policy") == "typeguard-gpt-5.4-high"
 
 

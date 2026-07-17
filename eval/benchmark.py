@@ -51,13 +51,13 @@ class Model:
             raw.get("attack_model_name", "AI assistant"))
 
     def pipeline_name(self, system: str, variant: str) -> str:
-        # CaMeL builds this name itself so the camel branch must match its
-        # patched make_tools_pipeline.
+        # The camel names match upstream's own suffixes. +camel is the fresh
+        # no policy pass and +camel+secpol replays it with policies.
         if system == "typeguard":
             return f"typeguard{'' if variant == 'policy' else '-nopolicy'}-{self.name}"
         model_id = self.camel_model.split(":")[1]
         base = f"{model_id}-{self.agent_config.get('reasoningEffort')}" if self.camel_reasoning else model_id
-        return base + ("+camel" if variant == "policy" else "+camel-nopolicy")
+        return base + ("+camel+secpol" if variant == "policy" else "+camel")
 
 
 @dataclass(frozen=True)

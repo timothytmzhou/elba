@@ -52,8 +52,22 @@ def _llm_token_usage(llm_user_dir: Path) -> dict | None:
         return None
 
 
+def _pipeline(spec: dict, private: Path):
+    if "camel_model" in spec:
+        from camel_eval.worker import make_pipeline
+
+        return make_pipeline(spec)
+    from bridge import HaskellAgentPipeline
+
+    private.mkdir(parents=True, exist_ok=True)
+    config = private / "config.json"
+    config.write_text(json.dumps(spec["agent_config"]))
+    return HaskellAgentPipeline(spec["exe"], spec["pipeline_name"], str(config),
+                                str(private / "transcript.jsonl"), private / "llm")
+
+
 def run_benchmark(spec: dict) -> None:
-    """Run one typeguard benchmark in this process and write its result."""
+    """Run one benchmark in this process and write its result."""
     from agentdojo.attacks.attack_registry import load_attack
     from agentdojo.benchmark import (
         TaskResults, run_task_with_injection_tasks, run_task_without_injection_tasks)
@@ -62,21 +76,18 @@ def run_benchmark(spec: dict) -> None:
     from agentdojo.models import MODEL_NAMES
     from agentdojo.task_suite.load_suites import get_suite
 
-    from bridge import HaskellAgentPipeline
-
     TaskResults.model_rebuild()
     logdir = Path(spec["logdir"])
     # important_instructions embeds a model name matched against MODEL_NAMES
     MODEL_NAMES.setdefault(spec["pipeline_name"], spec["attack_model_name"])
+    MODEL_NAMES.setdefault(spec["pipeline_name"].removesuffix("+secpol"),
+                           spec["attack_model_name"])
 
     suite = get_suite(spec["benchmark_version"], spec["suite"])
     slug = "-".join([spec["suite"], spec["task_id"], spec["attack"], spec["injection_task_id"]])
     private = logdir / spec["pipeline_name"] / ".agent" / slug
-    private.mkdir(parents=True, exist_ok=True)
-    config = private / "config.json"
-    config.write_text(json.dumps(spec["agent_config"]))
-    pipeline = HaskellAgentPipeline(spec["exe"], spec["pipeline_name"], str(config),
-                                    str(private / "transcript.jsonl"), private / "llm")
+    pipeline = _pipeline(spec, private)
+    assert pipeline.name == spec["pipeline_name"], pipeline.name
 
     with OutputLogger(str(logdir)):
         task = suite.get_user_task_by_id(spec["task_id"])
@@ -89,13 +100,14 @@ def run_benchmark(spec: dict) -> None:
                                           injection_tasks=[spec["injection_task_id"]],
                                           benchmark_version=spec["benchmark_version"])
 
-    result_path = (logdir / spec["pipeline_name"] / spec["suite"] / spec["task_id"]
-                   / spec["attack"] / f"{spec['injection_task_id']}.json")
-    result = json.loads(result_path.read_text())
-    result["tokens"] = _llm_token_usage(private / "llm")
-    result["agent_transcript"] = str(private / "transcript.jsonl")
-    result_path.write_text(json.dumps(result))
-    print(f"[done] {slug}: utility={result['utility']} security={result['security']}", flush=True)
+    if "exe" in spec:
+        result_path = (logdir / spec["pipeline_name"] / spec["suite"] / spec["task_id"]
+                       / spec["attack"] / f"{spec['injection_task_id']}.json")
+        result = json.loads(result_path.read_text())
+        result["tokens"] = _llm_token_usage(private / "llm")
+        result["agent_transcript"] = str(private / "transcript.jsonl")
+        result_path.write_text(json.dumps(result))
+    print(f"[done] {slug}", flush=True)
 
 
 def resolve_typeguard_exes(benchmarks: list[Benchmark], build: bool = True) -> dict[str, str]:
@@ -118,9 +130,9 @@ def _spec(bench, model, logdir, benchmark_version, exes) -> dict:
         "benchmark_version": benchmark_version, "logdir": str(logdir / f"rep{bench.rep}"),
         "pipeline_name": model.pipeline_name(bench.system, bench.variant),
     }
+    spec |= {"attack_model_name": model.attack_model_name}
     if bench.system == "typeguard":
-        spec |= {"exe": exes[_target(bench)], "agent_config": model.agent_config,
-                 "attack_model_name": model.attack_model_name}
+        spec |= {"exe": exes[_target(bench)], "agent_config": model.agent_config}
     else:
         spec |= {"camel_model": model.camel_model,
                  "reasoning_effort": model.agent_config.get("reasoningEffort")}
@@ -182,9 +194,13 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
             print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] {shout}: {slug}",
                   flush=True)
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        for f in as_completed([pool.submit(run_one, b) for b in benchmarks]):
-            f.result()
+    # camel+secpol replays the +camel recordings, so those run first
+    waves = [[b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")],
+             [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]]
+    for wave in waves:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for f in as_completed([pool.submit(run_one, b) for b in wave]):
+                f.result()
     return done
 
 

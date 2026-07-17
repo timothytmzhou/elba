@@ -46,7 +46,7 @@ benchmark.py   what to run: model configs, run matrix, plan + cost estimate
 bridge.py      the JSON protocol spoken with a Haskell agent binary
 process.py     data processing: dump.jsonl, the Newcombe CIs, LaTeX tables
 configs/       one JSON per model — pass any subset via --models
-camel_eval/    self-contained CaMeL baseline (checkout, diff, worker)
+camel_eval/    self-contained CaMeL baseline (pristine checkout, worker)
 stub_agent.py  scripted fake agent; lets tests run the whole pipeline
 tests/         pytest suite, no LLM calls:  python -m pytest eval/tests
 ```
@@ -94,8 +94,7 @@ Drop a JSON into `configs/`:
 ```
 
 (the plan refuses to guess prices for unknown models, delete
-`eval/pricing.json` to refetch). Models unknown to CaMeL get one
-registration line in `camel_eval/camel.diff`.
+`eval/pricing.json` to refetch).
 
 ## Prerequisites
 
@@ -103,6 +102,6 @@ registration line in `camel_eval/camel.diff`.
   the `llm` CLI with a stored OpenAI key (`llm keys set openai`) or
   `OPENAI_API_KEY` in the environment. Each parallel agent gets a private
   `llm` state dir, which is also where token counts are measured from.
-- For CaMeL: `uv`. The checkout (`<repo>/camel`, gitignored) is cloned and
-  patched automatically on first use; `OPENAI_API_KEY` is written into
-  `camel/.env`.
+- For CaMeL: `uv`. The checkout (`<repo>/camel`, gitignored) is cloned
+  automatically on first use and asserted unmodified; `OPENAI_API_KEY` is
+  written into `camel/.env`.
