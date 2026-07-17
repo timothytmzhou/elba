@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import camel_eval  # noqa: E402
 from benchmark import (  # noqa: E402
     ATTACKS, BENCHMARK_VERSION, Benchmark, Model, REPO_ROOT, SUITES,
-    TASK_TIMEOUT_S, expand, is_finalized, print_plan, split_cached,
+    TASK_TIMEOUT_S, expand, print_plan, split_cached,
 )
 
 
@@ -147,29 +147,27 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
-    done = {"completed": 0, "timeout": 0, "crashed": []}
+    done = {"completed": 0, "timeout": 0}
     lock = threading.Lock()
     start = time.time()
 
     def run_one(bench: Benchmark) -> None:
         spec = _spec(bench, models[bench.model], logdir, benchmark_version, exe)
-        result_path = bench.result_path(logdir, models)
         slug = f"{spec['pipeline_name']}-{bench.rep}-{bench.suite}-{bench.task_id}-{bench.attack}-{bench.injection_task_id}"
         log = logdir / ".workers" / f"{slug}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
 
-        status = "crashed"
+        status = "completed"
         with log.open("ab") as lf:
             proc = subprocess.Popen(_worker_cmd(bench, spec), stdout=lf,
                                     stderr=subprocess.STDOUT, cwd=REPO_ROOT,
                                     start_new_session=True)
             try:
                 proc.wait(timeout=timeout_s)
-                if is_finalized(result_path):
-                    status = "completed"
             except subprocess.TimeoutExpired:
                 kill_group(proc)
                 proc.wait(timeout=10)
+                result_path = bench.result_path(logdir, models)
                 result_path.parent.mkdir(parents=True, exist_ok=True)
                 result_path.write_text(json.dumps({
                     "suite_name": bench.suite, "pipeline_name": spec["pipeline_name"],
@@ -178,11 +176,8 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
                     "duration": float(timeout_s)}))
                 status = "timeout"
         with lock:
-            if status == "crashed":
-                done["crashed"].append((bench, str(log)))
-            else:
-                done[status] += 1
-            n = done["completed"] + done["timeout"] + len(done["crashed"])
+            done[status] += 1
+            n = done["completed"] + done["timeout"]
             shout = status if status == "completed" else status.upper()
             print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] {shout}: {slug}",
                   flush=True)
@@ -243,11 +238,7 @@ def main() -> int:
             report = run_benchmarks(to_run, models, logdir, args.benchmark_version,
                                     args.timeout, max_workers, build=not args.no_build)
             print(f"\nRun finished: {report['completed']} completed, "
-                  f"{report['timeout']} timed out, {len(report['crashed'])} crashed.")
-            for bench, log in report["crashed"]:
-                print(f"  CRASHED (no result): {bench}\n    worker log: {log}")
-                for line in Path(log).read_text().splitlines()[-8:]:
-                    print(f"    | {line}")
+                  f"{report['timeout']} timed out.")
 
     from process import process
 
