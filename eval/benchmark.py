@@ -75,10 +75,22 @@ class Benchmark:
     def benign(self) -> bool:
         return self.attack == BENIGN
 
+    @property
+    def slug(self) -> str:
+        return "-".join([self.system, self.variant, self.model, f"rep{self.rep}",
+                         self.suite, self.task_id, self.attack, self.injection_task_id])
+
     def result_path(self, logdir: Path, models: dict[str, Model]) -> Path:
         pipeline = models[self.model].pipeline_name(self.system, self.variant)
         return (logdir / f"rep{self.rep}" / pipeline / self.suite / self.task_id
                 / self.attack / f"{self.injection_task_id}.json")
+
+    def write_timeout(self, logdir: Path, models: dict[str, Model], timeout_s: int) -> None:
+        path = self.result_path(logdir, models)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"utility": False, "security": True,
+                                    "error": f"killed after {timeout_s}s budget",
+                                    "duration": float(timeout_s)}))
 
 
 def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):

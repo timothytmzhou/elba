@@ -148,30 +148,23 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
     def run_one(bench: Benchmark) -> bool:
-        """Runs one worker to completion and reports whether it timed out."""
-        spec = _spec(bench, models[bench.model], logdir, benchmark_version, exe)
-        slug = f"{spec['pipeline_name']}-{bench.rep}-{bench.suite}-{bench.task_id}-{bench.attack}-{bench.injection_task_id}"
-        log = logdir / ".workers" / f"{slug}.log"
+        """Runs one worker to completion. Returns True if it timed out."""
+        log = logdir / ".workers" / f"{bench.slug}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
-
         with log.open("ab") as lf:
-            proc = subprocess.Popen(_worker_cmd(spec), stdout=lf,
-                                    stderr=subprocess.STDOUT, cwd=REPO_ROOT,
+            proc = subprocess.Popen(_worker_cmd(_spec(bench, models[bench.model], logdir,
+                                                      benchmark_version, exe)),
+                                    stdout=lf, stderr=subprocess.STDOUT, cwd=REPO_ROOT,
                                     start_new_session=True)
             try:
                 proc.wait(timeout=timeout_s)
+                return False
             except subprocess.TimeoutExpired:
                 kill_group(proc)
                 proc.wait(timeout=10)
-                result_path = bench.result_path(logdir, models)
-                result_path.parent.mkdir(parents=True, exist_ok=True)
-                result_path.write_text(json.dumps({
-                    "utility": False, "security": True,
-                    "error": f"killed after {timeout_s}s budget",
-                    "duration": float(timeout_s)}))
-                tqdm.write(f"TIMEOUT: {slug}")
+                bench.write_timeout(logdir, models, timeout_s)
+                tqdm.write(f"TIMEOUT: {bench.slug}")
                 return True
-        return False
 
     # camel+secpol replays the +camel recordings, so those run first
     waves = [[b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")],
