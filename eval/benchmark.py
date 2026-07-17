@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -140,6 +141,11 @@ class Result:
         return Result(r["utility"], r["security"], r.get("duration"), r.get("tokens"),
                       r.get("error"), final, r.get("messages") or [],
                       r.get("agent_transcript"), str(path))
+
+
+class Outcome(Enum):
+    COMPLETED = "completed"
+    TIMEOUT = "timeout"
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ import signal
 import sqlite3
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 from tqdm import tqdm
@@ -27,8 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import camel_eval  # noqa: E402
 from benchmark import (  # noqa: E402
-    ATTACKS, BENCHMARK_VERSION, Benchmark, Model, REPO_ROOT, RunReport, SUITES,
-    TASK_TIMEOUT_S, expand, print_plan, split_cached,
+    ATTACKS, BENCHMARK_VERSION, Benchmark, Model, Outcome, REPO_ROOT, RunReport,
+    SUITES, TASK_TIMEOUT_S, expand, print_plan, split_cached,
 )
 
 
@@ -141,44 +142,57 @@ def _worker_cmd(spec: dict) -> list[str]:
     return camel_eval.worker_cmd(spec)
 
 
+def run_with_timeout(cmd: list[str], log: Path, timeout_s: int) -> Outcome:
+    """Run cmd as its own process group, output to log. COMPLETED if it exits
+    on its own, TIMEOUT if it outlasts the budget and is killed. Generic: it
+    knows nothing about benchmarks."""
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("ab") as out:
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT,
+                                cwd=REPO_ROOT, start_new_session=True)
+        try:
+            proc.wait(timeout=timeout_s)
+            return Outcome.COMPLETED
+        except subprocess.TimeoutExpired:
+            kill_group(proc)  # the worker spawns llm and uv children
+            proc.wait(timeout=10)
+            return Outcome.TIMEOUT
+
+
+def _record_timeout(bench: Benchmark, logdir: Path, models: dict, timeout_s: int) -> None:
+    path = bench.result_path(logdir, models)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"utility": False, "security": True,
+                                "error": f"killed after {timeout_s}s budget",
+                                "duration": float(timeout_s)}))
+
+
 def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max_workers,
                    build: bool = True) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
-    def run(bench: Benchmark) -> bool:
-        """Run one task as its own process. If it outlasts the budget, kill it
-        and its children, record a timeout failure, and return True."""
+    def run_task(bench: Benchmark) -> Outcome:
         cmd = _worker_cmd(_spec(bench, models[bench.model], logdir, benchmark_version, exe))
-        log = logdir / ".workers" / f"{bench.slug}.log"
-        log.parent.mkdir(parents=True, exist_ok=True)
-        with log.open("ab") as out:
-            proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT,
-                                    cwd=REPO_ROOT, start_new_session=True)
-            try:
-                proc.wait(timeout=timeout_s)
-                return False
-            except subprocess.TimeoutExpired:
-                kill_group(proc)
-                proc.wait(timeout=10)
-                path = bench.result_path(logdir, models)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps({"utility": False, "security": True,
-                                            "error": f"killed after {timeout_s}s budget",
-                                            "duration": float(timeout_s)}))
+        outcome = run_with_timeout(cmd, logdir / ".workers" / f"{bench.slug}.log", timeout_s)
+        match outcome:
+            case Outcome.TIMEOUT:
+                _record_timeout(bench, logdir, models, timeout_s)
                 tqdm.write(f"TIMEOUT: {bench.slug}")
-                return True
+            case Outcome.COMPLETED:
+                pass
+        return outcome
 
     # camel+secpol replays the recordings +camel writes, so it runs as a second
     # wave once the whole first wave has finished
     record = [b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")]
     replay = [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]
-    timeouts = 0
+    tally = Counter()
     for wave in (record, replay):
         if wave:
-            timeouts += sum(thread_map(run, wave, max_workers=max_workers))
-    return RunReport(completed=len(benchmarks) - timeouts, timeout=timeouts)
+            tally.update(thread_map(run_task, wave, max_workers=max_workers))
+    return RunReport(completed=tally[Outcome.COMPLETED], timeout=tally[Outcome.TIMEOUT])
 
 
 def main() -> int:
