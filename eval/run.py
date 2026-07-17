@@ -18,10 +18,10 @@ import signal
 import sqlite3
 import subprocess
 import sys
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from tqdm import tqdm
+from tqdm.contrib.concurrent import thread_map
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -147,17 +147,13 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
-    report = RunReport()
-    lock = threading.Lock()
-    start = time.time()
-
-    def run_one(bench: Benchmark) -> None:
+    def run_one(bench: Benchmark) -> bool:
+        """Runs one worker to completion and reports whether it timed out."""
         spec = _spec(bench, models[bench.model], logdir, benchmark_version, exe)
         slug = f"{spec['pipeline_name']}-{bench.rep}-{bench.suite}-{bench.task_id}-{bench.attack}-{bench.injection_task_id}"
         log = logdir / ".workers" / f"{slug}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
 
-        timed_out = False
         with log.open("ab") as lf:
             proc = subprocess.Popen(_worker_cmd(spec), stdout=lf,
                                     stderr=subprocess.STDOUT, cwd=REPO_ROOT,
@@ -173,23 +169,16 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
                     "utility": False, "security": True,
                     "error": f"killed after {timeout_s}s budget",
                     "duration": float(timeout_s)}))
-                timed_out = True
-        with lock:
-            if timed_out:
-                report.timeout += 1
-            else:
-                report.completed += 1
-            n = report.completed + report.timeout
-            print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] "
-                  f"{'TIMEOUT' if timed_out else 'completed'}: {slug}", flush=True)
+                tqdm.write(f"TIMEOUT: {slug}")
+                return True
+        return False
 
     # camel+secpol replays the +camel recordings, so those run first
     waves = [[b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")],
              [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]]
-    for wave in waves:
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            list(pool.map(run_one, wave))
-    return report
+    timeouts = sum(sum(thread_map(run_one, wave, max_workers=max_workers))
+                   for wave in waves if wave)
+    return RunReport(completed=len(benchmarks) - timeouts, timeout=timeouts)
 
 
 def main() -> int:
