@@ -64,7 +64,6 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
     print(f"[done] {bench.slug}", flush=True)
 
 
-# Drives one agentdojo task through a ready pipeline. Shared by both systems.
 def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str,
                        pipeline) -> None:
     from agentdojo.attacks.attack_registry import load_attack
@@ -132,7 +131,6 @@ def _worker_cmd(bench: Benchmark, config_path: str, logdir: Path, benchmark_vers
     return camel_eval.worker_cmd(args)
 
 
-# Runs cmd under a budget, killing its process group if it runs over.
 def run_with_timeout(cmd: list[str], log: Path, timeout_s: int) -> Outcome:
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("ab") as out:

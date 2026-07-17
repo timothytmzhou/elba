@@ -125,7 +125,7 @@ def expand(models: list[Model], suites: list[str], attacks: list[str], repeats: 
     return benchmarks
 
 
-# A task's output. Utility False with an error covers denials and timeouts.
+# Utility False with an error covers denials and timeouts.
 @dataclass(frozen=True)
 class Result:
     utility: bool
