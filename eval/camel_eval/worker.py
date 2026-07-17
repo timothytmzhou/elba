@@ -1,9 +1,5 @@
-"""Builds the CaMeL pipeline inside the checkout venv.
-
-+camel is upstream's fresh no policy pass. +camel+secpol replays a recorded
-+camel run with the suite's security policies, upstream's own methodology.
-"""
-
+# Runs one benchmark on CaMeL, inside the checkout venv. +camel is upstream's
+# fresh no policy pass. +camel+secpol replays that recording under the policies.
 import os
 import tempfile
 
@@ -14,7 +10,9 @@ _upstream = camel.models._is_oai_reasoning_model
 camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
-def make_pipeline(bench, model, logdir):
+def run_camel(bench, model, logdir, benchmark_version):
+    from run import run_agentdojo_task
+
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
         model.camel_model,
@@ -33,4 +31,4 @@ def make_pipeline(bench, model, logdir):
         tmp = tempfile.mkdtemp()
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
-    return pipeline
+    run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)

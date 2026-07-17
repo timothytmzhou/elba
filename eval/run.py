@@ -54,24 +54,19 @@ def _llm_token_usage(llm_user_dir: Path) -> dict | None:
         return None
 
 
-def _pipeline(bench: Benchmark, model: Model, logdir: Path, private: Path):
-    pipeline_name = model.pipeline_name(bench.system, bench.variant)
-    if bench.system == "camel":
-        from camel_eval.worker import make_pipeline
-
-        return make_pipeline(bench, model, logdir)
-    from bridge import HaskellAgentPipeline
-
-    private.mkdir(parents=True, exist_ok=True)
-    config = private / "config.json"
-    config.write_text(json.dumps(asdict(model.agent_config)))
-    cmd = [typeguard_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
-    return HaskellAgentPipeline(cmd, pipeline_name, str(config),
-                                str(private / "transcript.jsonl"), private / "llm")
-
-
 def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
-    """Run one benchmark in this process and write its result."""
+    if bench.system == "camel":
+        from camel_eval.worker import run_camel
+
+        run_camel(bench, model, logdir, benchmark_version)
+    else:
+        run_typeguard(bench, model, logdir, benchmark_version)
+    print(f"[done] {bench.slug}", flush=True)
+
+
+# Drives one agentdojo task through a ready pipeline. Shared by both systems.
+def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str,
+                       pipeline) -> None:
     from agentdojo.attacks.attack_registry import load_attack
     from agentdojo.benchmark import (
         TaskResults, run_task_with_injection_tasks, run_task_without_injection_tasks)
@@ -82,16 +77,12 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
 
     TaskResults.model_rebuild()
     rep_dir = logdir / f"rep{bench.rep}"
-    pipeline_name = model.pipeline_name(bench.system, bench.variant)
+    assert pipeline.name == model.pipeline_name(bench.system, bench.variant), pipeline.name
     # important_instructions embeds a model name matched against MODEL_NAMES
-    MODEL_NAMES.setdefault(pipeline_name, model.attack_model_name)
-    MODEL_NAMES.setdefault(pipeline_name.removesuffix("+secpol"), model.attack_model_name)
+    MODEL_NAMES.setdefault(pipeline.name, model.attack_model_name)
+    MODEL_NAMES.setdefault(pipeline.name.removesuffix("+secpol"), model.attack_model_name)
 
     suite = get_suite(benchmark_version, bench.suite)
-    private = rep_dir / pipeline_name / ".agent" / bench.slug
-    pipeline = _pipeline(bench, model, logdir, private)
-    assert pipeline.name == pipeline_name, pipeline.name
-
     with OutputLogger(str(rep_dir)):
         task = suite.get_user_task_by_id(bench.task_id)
         if bench.benign:
@@ -103,13 +94,25 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
                                           injection_tasks=[bench.injection_task_id],
                                           benchmark_version=benchmark_version)
 
-    if bench.system == "typeguard":
-        path = bench.result_path(logdir, model)
-        result = json.loads(path.read_text())
-        result["tokens"] = _llm_token_usage(private / "llm")
-        result["agent_transcript"] = str(private / "transcript.jsonl")
-        path.write_text(json.dumps(result))
-    print(f"[done] {bench.slug}", flush=True)
+
+def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
+    from bridge import HaskellAgentPipeline
+
+    private = logdir / f"rep{bench.rep}" / model.pipeline_name(bench.system, bench.variant) \
+        / ".agent" / bench.slug
+    private.mkdir(parents=True, exist_ok=True)
+    config = private / "config.json"
+    config.write_text(json.dumps(asdict(model.agent_config)))
+    cmd = [typeguard_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
+    pipeline = HaskellAgentPipeline(cmd, model.pipeline_name(bench.system, bench.variant),
+                                    str(config), str(private / "transcript.jsonl"), private / "llm")
+    run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+
+    path = bench.result_path(logdir, model)
+    result = json.loads(path.read_text())
+    result["tokens"] = _llm_token_usage(private / "llm")
+    result["agent_transcript"] = str(private / "transcript.jsonl")
+    path.write_text(json.dumps(result))
 
 
 def build_typeguard() -> None:
