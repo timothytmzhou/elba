@@ -20,14 +20,14 @@ import subprocess
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import camel_eval  # noqa: E402
 from benchmark import (  # noqa: E402
-    ATTACKS, BENCHMARK_VERSION, Benchmark, Model, REPO_ROOT, SUITES,
+    ATTACKS, BENCHMARK_VERSION, Benchmark, Model, REPO_ROOT, RunReport, SUITES,
     TASK_TIMEOUT_S, expand, print_plan, split_cached,
 )
 
@@ -124,8 +124,8 @@ def _spec(bench, model, logdir, benchmark_version, exe) -> dict:
         "injection_task_id": bench.injection_task_id, "variant": bench.variant,
         "benchmark_version": benchmark_version, "logdir": str(logdir / f"rep{bench.rep}"),
         "pipeline_name": model.pipeline_name(bench.system, bench.variant),
+        "attack_model_name": model.attack_model_name,
     }
-    spec |= {"attack_model_name": model.attack_model_name}
     if bench.system == "typeguard":
         cmd = [exe, "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
         spec |= {"exe": cmd, "agent_config": model.agent_config}
@@ -135,19 +135,19 @@ def _spec(bench, model, logdir, benchmark_version, exe) -> dict:
     return spec
 
 
-def _worker_cmd(bench: Benchmark, spec: dict) -> list[str]:
-    if bench.system == "typeguard":
+def _worker_cmd(spec: dict) -> list[str]:
+    if "exe" in spec:
         return [sys.executable, __file__, "worker", json.dumps(spec)]
     return camel_eval.worker_cmd(spec)
 
 
 def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max_workers,
-                   build: bool = True) -> dict:
+                   build: bool = True) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
-    done = {"completed": 0, "timeout": 0}
+    report = RunReport()
     lock = threading.Lock()
     start = time.time()
 
@@ -157,9 +157,9 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
         log = logdir / ".workers" / f"{slug}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
 
-        status = "completed"
+        timed_out = False
         with log.open("ab") as lf:
-            proc = subprocess.Popen(_worker_cmd(bench, spec), stdout=lf,
+            proc = subprocess.Popen(_worker_cmd(spec), stdout=lf,
                                     stderr=subprocess.STDOUT, cwd=REPO_ROOT,
                                     start_new_session=True)
             try:
@@ -170,26 +170,26 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
                 result_path = bench.result_path(logdir, models)
                 result_path.parent.mkdir(parents=True, exist_ok=True)
                 result_path.write_text(json.dumps({
-                    "suite_name": bench.suite, "pipeline_name": spec["pipeline_name"],
-                    "user_task_id": bench.task_id, "utility": False, "security": True,
+                    "utility": False, "security": True,
                     "error": f"killed after {timeout_s}s budget",
                     "duration": float(timeout_s)}))
-                status = "timeout"
+                timed_out = True
         with lock:
-            done[status] += 1
-            n = done["completed"] + done["timeout"]
-            shout = status if status == "completed" else status.upper()
-            print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] {shout}: {slug}",
-                  flush=True)
+            if timed_out:
+                report.timeout += 1
+            else:
+                report.completed += 1
+            n = report.completed + report.timeout
+            print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] "
+                  f"{'TIMEOUT' if timed_out else 'completed'}: {slug}", flush=True)
 
     # camel+secpol replays the +camel recordings, so those run first
     waves = [[b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")],
              [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]]
     for wave in waves:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for f in as_completed([pool.submit(run_one, b) for b in wave]):
-                f.result()
-    return done
+            list(pool.map(run_one, wave))
+    return report
 
 
 def main() -> int:
@@ -237,8 +237,8 @@ def main() -> int:
                     return 1
             report = run_benchmarks(to_run, models, logdir, args.benchmark_version,
                                     args.timeout, max_workers, build=not args.no_build)
-            print(f"\nRun finished: {report['completed']} completed, "
-                  f"{report['timeout']} timed out.")
+            print(f"\nRun finished: {report.completed} completed, "
+                  f"{report.timeout} timed out.")
 
     from process import process
 

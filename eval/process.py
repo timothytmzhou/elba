@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import asdict
 from pathlib import Path
 
 from scipy.stats import binomtest
 
-from benchmark import BENIGN, Model, suite_tasks
+from benchmark import BENIGN, Benchmark, Model, Result, suite_tasks
 
 SYSTEM_LABELS = {
     ("typeguard", "policy"): "TypeGuard",
@@ -58,7 +59,7 @@ def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
     return 100 * diff, 100 * lo, 100 * hi
 
 
-def load_results(logdir: Path, models: dict[str, Model]) -> list[dict]:
+def load_results(logdir: Path, models: dict[str, Model]) -> list[Result]:
     records = []
     for rep_dir in sorted(logdir.glob("rep*")):
         rep = int(rep_dir.name[3:])
@@ -66,45 +67,29 @@ def load_results(logdir: Path, models: dict[str, Model]) -> list[dict]:
             for system, variant in SYSTEM_LABELS:
                 pipeline = model.pipeline_name(system, variant)
                 for path in sorted((rep_dir / pipeline).glob("*/*/*/*.json")):
-                    try:
-                        r = json.loads(path.read_text())
-                    except (OSError, json.JSONDecodeError):
-                        continue
-                    if r.get("utility") not in (True, False):
-                        continue
-                    final = next((blk.get("content") or blk.get("text", "")
-                                  for m in reversed(r.get("messages") or [])
-                                  if m.get("role") == "assistant"
-                                  for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
-                    records.append({
-                        "rep": rep, "system": system, "variant": variant, "model": model.name,
-                        "pipeline": pipeline, "suite": path.parts[-4], "task": path.parts[-3],
-                        "attack": path.parts[-2], "injection_task": path.stem,
-                        "utility": r["utility"], "security": r["security"],
-                        "duration_s": r.get("duration"), "tokens": r.get("tokens"),
-                        "timestamp": r.get("evaluation_timestamp"),
-                        "error": r.get("error"), "final_output": final,
-                        "messages": r.get("messages") or [],
-                        "agent_transcript": r.get("agent_transcript"), "result_file": str(path),
-                    })
+                    bench = Benchmark(system, variant, model.name, rep, path.parts[-4],
+                                      path.parts[-3], path.parts[-2], path.stem)
+                    if r := Result.load(bench, path):
+                        records.append(r)
     return records
 
 
 def _by(records, **filters):
-    return [r for r in records if all(r[k] == v for k, v in filters.items())]
+    return [r for r in records
+            if all(getattr(r.bench, k) == v for k, v in filters.items())]
 
 
 def utility_cell(records) -> str:
     if not records:
         return "--"
-    n = sum(1 for r in records if r["utility"])
+    n = sum(1 for r in records if r.utility)
     return rf"{n}/{len(records)} ({100 * n / len(records):.1f}\%)"
 
 
 def security_cell(records) -> str:
     if not records:
         return "--"
-    resisted = sum(1 for r in records if not r["security"])  # security True means the attack won
+    resisted = sum(1 for r in records if not r.security)  # security True means the attack won
     return rf"{resisted}/{len(records)}"
 
 
@@ -183,10 +168,10 @@ def ci_table(records, suites, models, attacks) -> str:
     for suite in suites:
         for model in models.values():
             for setting, attack, variant in settings:
-                key = lambda r: (r["task"], r["injection_task"], r["rep"])
-                tg = {key(r): r["utility"] for r in _by(records, system="typeguard",
+                key = lambda r: (r.bench.task_id, r.bench.injection_task_id, r.bench.rep)
+                tg = {key(r): r.utility for r in _by(records, system="typeguard",
                       variant=variant, model=model.name, suite=suite, attack=attack)}
-                cm = {key(r): r["utility"] for r in _by(records, system="camel",
+                cm = {key(r): r.utility for r in _by(records, system="camel",
                       variant=variant, model=model.name, suite=suite, attack=attack)}
                 common = sorted(set(tg) & set(cm))
                 if not common:
@@ -202,9 +187,9 @@ def process(logdir, models, suites, attacks, repeats) -> Path:
     records = load_results(logdir, models)
     outdir = logdir / "results"
     outdir.mkdir(parents=True, exist_ok=True)
-    (outdir / "dump.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
+    (outdir / "dump.jsonl").write_text("".join(json.dumps(asdict(r)) + "\n" for r in records))
     for suite in suites:
-        if any(r["suite"] == suite for r in records):
+        if any(r.bench.suite == suite for r in records):
             (outdir / f"table_{suite}.tex").write_text(suite_table(records, suite, models, attacks, repeats))
             print(f"\n{suite}:")
             for system, variant in ROW_ORDER:

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -106,15 +106,46 @@ def expand(models, suites, attacks, repeats, systems=("typeguard", "camel")) -> 
     return benchmarks
 
 
-def is_finalized(path: Path) -> bool:
-    try:
-        return json.loads(path.read_text()).get("utility") in (True, False)
-    except (OSError, json.JSONDecodeError):
-        return False
+@dataclass(frozen=True)
+class Result:
+    """One task evaluation's output. Utility False with an error covers
+    policy denials and timeouts."""
+    bench: Benchmark
+    utility: bool
+    security: bool
+    duration_s: float | None = None
+    tokens: dict | None = None
+    error: str | None = None
+    final_output: str | None = None
+    messages: list = field(default_factory=list)
+    agent_transcript: str | None = None
+    result_file: str = ""
+
+    @staticmethod
+    def load(bench: Benchmark, path: Path) -> Result | None:
+        try:
+            r = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+        if r.get("utility") not in (True, False):
+            return None
+        final = next((blk.get("content") or blk.get("text", "")
+                      for m in reversed(r.get("messages") or [])
+                      if m.get("role") == "assistant"
+                      for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
+        return Result(bench, r["utility"], r["security"], r.get("duration"),
+                      r.get("tokens"), r.get("error"), final, r.get("messages") or [],
+                      r.get("agent_transcript"), str(path))
+
+
+@dataclass
+class RunReport:
+    completed: int = 0
+    timeout: int = 0
 
 
 def split_cached(benchmarks, logdir, models):
-    cached = [b for b in benchmarks if is_finalized(b.result_path(logdir, models))]
+    cached = [b for b in benchmarks if Result.load(b, b.result_path(logdir, models))]
     done = set(cached)
     return [b for b in benchmarks if b not in done], cached
 

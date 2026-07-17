@@ -15,7 +15,7 @@ import pytest
 EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
-from benchmark import Benchmark, Model, REPO_ROOT, expand, split_cached  # noqa: E402
+from benchmark import Benchmark, Model, REPO_ROOT, Result, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
@@ -126,7 +126,7 @@ def slack_run(tmp_path, agent_exe, mock_llm):
 
 def test_worker_end_to_end(slack_run):
     models, logdir, report = slack_run
-    assert report["completed"] == 2
+    assert report.completed == 2
     benign = json.loads(
         (logdir / "rep1/typeguard-gpt-5.4-high/slack/user_task_0/none/none.json").read_text())
     assert benign["utility"] is True
@@ -143,7 +143,7 @@ def test_processing_outputs(slack_run):
     outdir = process(logdir, models, ["slack"], ["important_instructions"], repeats=1)
     dump = [json.loads(l) for l in (outdir / "dump.jsonl").read_text().splitlines()]
     assert len(dump) == 2
-    rec = next(r for r in dump if r["attack"] == "none")
+    rec = next(r for r in dump if r["bench"]["attack"] == "none")
     assert rec["utility"] is True and rec["final_output"] == "I read the page."
     assert rec["duration_s"] is not None
 
@@ -184,7 +184,7 @@ def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
                             timeout_s=5, max_workers=1, build=False)
     result = json.loads(bench.result_path(tmp_path / "logs", models).read_text())
     assert result["utility"] is False
-    assert report["timeout"] == 1
+    assert report.timeout == 1
 
 
 def test_suite_table_full_matrix(tmp_path):
@@ -197,14 +197,12 @@ def test_suite_table_full_matrix(tmp_path):
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
-            records.append(dict(rep=1, system=system, variant=variant, model=m.name,
-                                suite="slack", task=ut, attack="none",
-                                injection_task="none", utility=True, security=True))
+            records.append(Result(Benchmark(system, variant, m.name, 1, "slack", ut),
+                                  utility=True, security=True))
             for attack in attacks:
                 for it in injection_tasks:
-                    records.append(dict(
-                        rep=1, system=system, variant=variant, model=m.name,
-                        suite="slack", task=ut, attack=attack, injection_task=it,
+                    records.append(Result(
+                        Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
                         utility=True, security=(variant == "nopolicy")))
     tex = suite_table(records, "slack", models, attacks, repeats=1)
     # all four system rows including the no policy under attack cells
