@@ -143,9 +143,9 @@ def test_processing_outputs(slack_run):
     outdir = process(logdir, models, ["slack"], ["important_instructions"], repeats=1)
     dump = [json.loads(l) for l in (outdir / "dump.jsonl").read_text().splitlines()]
     assert len(dump) == 2
-    rec = next(r for r in dump if r["bench"]["attack"] == "none")
-    assert rec["utility"] is True and rec["final_output"] == "I read the page."
-    assert rec["duration_s"] is not None
+    rec = next(r for r in dump if r["benchmark"]["attack"] == "none")
+    assert rec["result"]["utility"] is True and rec["result"]["final_output"] == "I read the page."
+    assert rec["result"]["duration_s"] is not None
 
     tex = (outdir / "table_slack.tex").read_text()
     assert r"\begin{table}" in tex and r"\toprule" in tex
@@ -197,13 +197,12 @@ def test_suite_table_full_matrix(tmp_path):
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
-            records.append(Result(Benchmark(system, variant, m.name, 1, "slack", ut),
-                                  utility=True, security=True))
+            records.append((Benchmark(system, variant, m.name, 1, "slack", ut),
+                            Result(utility=True, security=True)))
             for attack in attacks:
                 for it in injection_tasks:
-                    records.append(Result(
-                        Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
-                        utility=True, security=(variant == "nopolicy")))
+                    records.append((Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
+                                    Result(utility=True, security=(variant == "nopolicy"))))
     tex = suite_table(records, "slack", models, attacks, repeats=1)
     # all four system rows including the no policy under attack cells
     for label in ["TypeGuard", "TypeGuard (no policy)", "CaMeL", "CaMeL (no policy)"]:

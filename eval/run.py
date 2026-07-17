@@ -141,35 +141,48 @@ def _worker_cmd(spec: dict) -> list[str]:
     return camel_eval.worker_cmd(spec)
 
 
+def _finished_within_budget(cmd: list[str], log: Path, timeout_s: int) -> bool:
+    """Runs cmd, its output going to log. True if it exited on its own, False
+    if it ran past the budget and was killed with its whole process group."""
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("ab") as lf:
+        proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT,
+                                cwd=REPO_ROOT, start_new_session=True)
+        try:
+            proc.wait(timeout=timeout_s)
+            return True
+        except subprocess.TimeoutExpired:
+            kill_group(proc)
+            proc.wait(timeout=10)
+            return False
+
+
+def _record_timeout(bench: Benchmark, logdir: Path, models: dict, timeout_s: int) -> None:
+    path = bench.result_path(logdir, models)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"utility": False, "security": True,
+                                "error": f"killed after {timeout_s}s budget",
+                                "duration": float(timeout_s)}))
+
+
 def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max_workers,
                    build: bool = True) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
-    def run_one(bench: Benchmark) -> bool:
-        """Runs one worker to completion. Returns True if it timed out."""
-        log = logdir / ".workers" / f"{bench.slug}.log"
-        log.parent.mkdir(parents=True, exist_ok=True)
-        with log.open("ab") as lf:
-            proc = subprocess.Popen(_worker_cmd(_spec(bench, models[bench.model], logdir,
-                                                      benchmark_version, exe)),
-                                    stdout=lf, stderr=subprocess.STDOUT, cwd=REPO_ROOT,
-                                    start_new_session=True)
-            try:
-                proc.wait(timeout=timeout_s)
-                return False
-            except subprocess.TimeoutExpired:
-                kill_group(proc)
-                proc.wait(timeout=10)
-                bench.write_timeout(logdir, models, timeout_s)
-                tqdm.write(f"TIMEOUT: {bench.slug}")
-                return True
+    def timed_out(bench: Benchmark) -> bool:
+        cmd = _worker_cmd(_spec(bench, models[bench.model], logdir, benchmark_version, exe))
+        if _finished_within_budget(cmd, logdir / ".workers" / f"{bench.slug}.log", timeout_s):
+            return False
+        _record_timeout(bench, logdir, models, timeout_s)
+        tqdm.write(f"TIMEOUT: {bench.slug}")
+        return True
 
     # camel+secpol replays the +camel recordings, so those run first
     waves = [[b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")],
              [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]]
-    timeouts = sum(sum(thread_map(run_one, wave, max_workers=max_workers))
+    timeouts = sum(sum(thread_map(timed_out, wave, max_workers=max_workers))
                    for wave in waves if wave)
     return RunReport(completed=len(benchmarks) - timeouts, timeout=timeouts)
 

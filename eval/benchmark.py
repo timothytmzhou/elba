@@ -85,13 +85,6 @@ class Benchmark:
         return (logdir / f"rep{self.rep}" / pipeline / self.suite / self.task_id
                 / self.attack / f"{self.injection_task_id}.json")
 
-    def write_timeout(self, logdir: Path, models: dict[str, Model], timeout_s: int) -> None:
-        path = self.result_path(logdir, models)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"utility": False, "security": True,
-                                    "error": f"killed after {timeout_s}s budget",
-                                    "duration": float(timeout_s)}))
-
 
 def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):
     from agentdojo.task_suite.load_suites import get_suite
@@ -120,9 +113,8 @@ def expand(models, suites, attacks, repeats, systems=("typeguard", "camel")) -> 
 
 @dataclass(frozen=True)
 class Result:
-    """One task evaluation's output. Utility False with an error covers
-    policy denials and timeouts."""
-    bench: Benchmark
+    """A task's output, kept separate from the Benchmark that produced it.
+    Utility False with an error covers both policy denials and timeouts."""
     utility: bool
     security: bool
     duration_s: float | None = None
@@ -134,7 +126,7 @@ class Result:
     result_file: str = ""
 
     @staticmethod
-    def load(bench: Benchmark, path: Path) -> Result | None:
+    def load(path: Path) -> Result | None:
         try:
             r = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError):
@@ -145,19 +137,19 @@ class Result:
                       for m in reversed(r.get("messages") or [])
                       if m.get("role") == "assistant"
                       for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
-        return Result(bench, r["utility"], r["security"], r.get("duration"),
-                      r.get("tokens"), r.get("error"), final, r.get("messages") or [],
+        return Result(r["utility"], r["security"], r.get("duration"), r.get("tokens"),
+                      r.get("error"), final, r.get("messages") or [],
                       r.get("agent_transcript"), str(path))
 
 
-@dataclass
+@dataclass(frozen=True)
 class RunReport:
     completed: int = 0
     timeout: int = 0
 
 
 def split_cached(benchmarks, logdir, models):
-    cached = [b for b in benchmarks if Result.load(b, b.result_path(logdir, models))]
+    cached = [b for b in benchmarks if Result.load(b.result_path(logdir, models))]
     done = set(cached)
     return [b for b in benchmarks if b not in done], cached
 

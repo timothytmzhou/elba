@@ -59,7 +59,7 @@ def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
     return 100 * diff, 100 * lo, 100 * hi
 
 
-def load_results(logdir: Path, models: dict[str, Model]) -> list[Result]:
+def load_results(logdir: Path, models: dict[str, Model]) -> list[tuple[Benchmark, Result]]:
     records = []
     for rep_dir in sorted(logdir.glob("rep*")):
         rep = int(rep_dir.name[3:])
@@ -69,27 +69,27 @@ def load_results(logdir: Path, models: dict[str, Model]) -> list[Result]:
                 for path in sorted((rep_dir / pipeline).glob("*/*/*/*.json")):
                     bench = Benchmark(system, variant, model.name, rep, path.parts[-4],
                                       path.parts[-3], path.parts[-2], path.stem)
-                    if r := Result.load(bench, path):
-                        records.append(r)
+                    if result := Result.load(path):
+                        records.append((bench, result))
     return records
 
 
 def _by(records, **filters):
-    return [r for r in records
-            if all(getattr(r.bench, k) == v for k, v in filters.items())]
+    return [(b, r) for b, r in records
+            if all(getattr(b, k) == v for k, v in filters.items())]
 
 
 def utility_cell(records) -> str:
     if not records:
         return "--"
-    n = sum(1 for r in records if r.utility)
+    n = sum(1 for _, r in records if r.utility)
     return rf"{n}/{len(records)} ({100 * n / len(records):.1f}\%)"
 
 
 def security_cell(records) -> str:
     if not records:
         return "--"
-    resisted = sum(1 for r in records if not r.security)  # security True means the attack won
+    resisted = sum(1 for _, r in records if not r.security)  # security True means the attack won
     return rf"{resisted}/{len(records)}"
 
 
@@ -168,10 +168,10 @@ def ci_table(records, suites, models, attacks) -> str:
     for suite in suites:
         for model in models.values():
             for setting, attack, variant in settings:
-                key = lambda r: (r.bench.task_id, r.bench.injection_task_id, r.bench.rep)
-                tg = {key(r): r.utility for r in _by(records, system="typeguard",
+                key = lambda b: (b.task_id, b.injection_task_id, b.rep)
+                tg = {key(b): r.utility for b, r in _by(records, system="typeguard",
                       variant=variant, model=model.name, suite=suite, attack=attack)}
-                cm = {key(r): r.utility for r in _by(records, system="camel",
+                cm = {key(b): r.utility for b, r in _by(records, system="camel",
                       variant=variant, model=model.name, suite=suite, attack=attack)}
                 common = sorted(set(tg) & set(cm))
                 if not common:
@@ -187,9 +187,10 @@ def process(logdir, models, suites, attacks, repeats) -> Path:
     records = load_results(logdir, models)
     outdir = logdir / "results"
     outdir.mkdir(parents=True, exist_ok=True)
-    (outdir / "dump.jsonl").write_text("".join(json.dumps(asdict(r)) + "\n" for r in records))
+    (outdir / "dump.jsonl").write_text("".join(
+        json.dumps({"benchmark": asdict(b), "result": asdict(r)}) + "\n" for b, r in records))
     for suite in suites:
-        if any(r.bench.suite == suite for r in records):
+        if any(b.suite == suite for b, _ in records):
             (outdir / f"table_{suite}.tex").write_text(suite_table(records, suite, models, attacks, repeats))
             print(f"\n{suite}:")
             for system, variant in ROW_ORDER:
