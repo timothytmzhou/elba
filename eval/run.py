@@ -159,27 +159,24 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
         log.parent.mkdir(parents=True, exist_ok=True)
 
         status = "crashed"
-        for _ in range(2):  # one retry for a worker that dies without a result
-            with log.open("ab") as lf:
-                proc = subprocess.Popen(_worker_cmd(bench, spec), stdout=lf,
-                                        stderr=subprocess.STDOUT, cwd=REPO_ROOT,
-                                        start_new_session=True)
-                try:
-                    proc.wait(timeout=timeout_s)
-                except subprocess.TimeoutExpired:
-                    kill_group(proc)
-                    proc.wait(timeout=10)
-                    result_path.parent.mkdir(parents=True, exist_ok=True)
-                    result_path.write_text(json.dumps({
-                        "suite_name": bench.suite, "pipeline_name": spec["pipeline_name"],
-                        "user_task_id": bench.task_id, "utility": False, "security": True,
-                        "error": f"killed after {timeout_s}s budget",
-                        "duration": float(timeout_s)}))
-                    status = "timeout"
-                    break
-            if is_finalized(result_path):
-                status = "completed"
-                break
+        with log.open("ab") as lf:
+            proc = subprocess.Popen(_worker_cmd(bench, spec), stdout=lf,
+                                    stderr=subprocess.STDOUT, cwd=REPO_ROOT,
+                                    start_new_session=True)
+            try:
+                proc.wait(timeout=timeout_s)
+                if is_finalized(result_path):
+                    status = "completed"
+            except subprocess.TimeoutExpired:
+                kill_group(proc)
+                proc.wait(timeout=10)
+                result_path.parent.mkdir(parents=True, exist_ok=True)
+                result_path.write_text(json.dumps({
+                    "suite_name": bench.suite, "pipeline_name": spec["pipeline_name"],
+                    "user_task_id": bench.task_id, "utility": False, "security": True,
+                    "error": f"killed after {timeout_s}s budget",
+                    "duration": float(timeout_s)}))
+                status = "timeout"
         with lock:
             if status == "crashed":
                 done["crashed"].append((bench, str(log)))
@@ -249,6 +246,8 @@ def main() -> int:
                   f"{report['timeout']} timed out, {len(report['crashed'])} crashed.")
             for bench, log in report["crashed"]:
                 print(f"  CRASHED (no result): {bench}\n    worker log: {log}")
+                for line in Path(log).read_text().splitlines()[-8:]:
+                    print(f"    | {line}")
 
     from process import process
 
