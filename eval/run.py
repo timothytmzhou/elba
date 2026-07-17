@@ -30,7 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import camel_eval  # noqa: E402
 from benchmark import (  # noqa: E402
     ATTACKS, BENCHMARK_VERSION, Benchmark, Model, Outcome, REPO_ROOT, RunReport,
-    SUITES, TASK_TIMEOUT_S, expand, print_plan, split_cached,
+    SUITES, TASK_TIMEOUT_S, expand, is_benign, load_model, pipeline_name,
+    print_plan, result_path, slug, split_cached,
 )
 
 
@@ -61,7 +62,7 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
         run_camel(bench, model, logdir, benchmark_version)
     else:
         run_typeguard(bench, model, logdir, benchmark_version)
-    print(f"[done] {bench.slug}", flush=True)
+    print(f"[done] {slug(bench)}", flush=True)
 
 
 def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str,
@@ -76,7 +77,6 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
 
     TaskResults.model_rebuild()
     rep_dir = logdir / f"rep{bench.rep}"
-    assert pipeline.name == model.pipeline_name(bench.system, bench.variant), pipeline.name
     # important_instructions embeds a model name matched against MODEL_NAMES
     MODEL_NAMES.setdefault(pipeline.name, model.attack_model_name)
     MODEL_NAMES.setdefault(pipeline.name.removesuffix("+secpol"), model.attack_model_name)
@@ -84,7 +84,7 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
     suite = get_suite(benchmark_version, bench.suite)
     with OutputLogger(str(rep_dir)):
         task = suite.get_user_task_by_id(bench.task_id)
-        if bench.benign:
+        if is_benign(bench):
             run_task_without_injection_tasks(suite, pipeline, task, rep_dir, force_rerun=False,
                                              benchmark_version=benchmark_version)
         else:
@@ -97,17 +97,16 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
 def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
     from bridge import HaskellAgentPipeline
 
-    private = logdir / f"rep{bench.rep}" / model.pipeline_name(bench.system, bench.variant) \
-        / ".agent" / bench.slug
+    private = logdir / f"rep{bench.rep}" / pipeline_name(bench) / ".agent" / slug(bench)
     private.mkdir(parents=True, exist_ok=True)
     config = private / "config.json"
     config.write_text(json.dumps(asdict(model.agent_config)))
     cmd = [typeguard_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
-    pipeline = HaskellAgentPipeline(cmd, model.pipeline_name(bench.system, bench.variant),
-                                    str(config), str(private / "transcript.jsonl"), private / "llm")
+    pipeline = HaskellAgentPipeline(cmd, pipeline_name(bench), str(config),
+                                    str(private / "transcript.jsonl"), private / "llm")
     run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
 
-    path = bench.result_path(logdir, model)
+    path = result_path(bench, logdir)
     result = json.loads(path.read_text())
     result["tokens"] = _llm_token_usage(private / "llm")
     result["agent_transcript"] = str(private / "transcript.jsonl")
@@ -145,8 +144,8 @@ def run_with_timeout(cmd: list[str], log: Path, timeout_s: int) -> Outcome:
             return Outcome.TIMEOUT
 
 
-def _record_timeout(bench: Benchmark, model: Model, logdir: Path, timeout_s: int) -> None:
-    path = bench.result_path(logdir, model)
+def _record_timeout(bench: Benchmark, logdir: Path, timeout_s: int) -> None:
+    path = result_path(bench, logdir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"utility": False, "security": True,
                                 "error": f"killed after {timeout_s}s budget",
@@ -157,7 +156,6 @@ def _record_timeout(bench: Benchmark, model: Model, logdir: Path, timeout_s: int
 def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir: Path,
                    benchmark_version: str, timeout_s: int, max_workers: int,
                    build: bool = True) -> RunReport:
-    models = {name: Model.load(path) for name, path in configs.items()}
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     if build and any(b.system == "typeguard" for b in benchmarks):
@@ -165,11 +163,11 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
 
     def run_task(bench: Benchmark) -> Outcome:
         cmd = _worker_cmd(bench, configs[bench.model], logdir, benchmark_version)
-        outcome = run_with_timeout(cmd, logdir / ".workers" / f"{bench.slug}.log", timeout_s)
+        outcome = run_with_timeout(cmd, logdir / ".workers" / f"{slug(bench)}.log", timeout_s)
         match outcome:
             case Outcome.TIMEOUT:
-                _record_timeout(bench, models[bench.model], logdir, timeout_s)
-                tqdm.write(f"TIMEOUT: {bench.slug}")
+                _record_timeout(bench, logdir, timeout_s)
+                tqdm.write(f"TIMEOUT: {slug(bench)}")
             case Outcome.COMPLETED:
                 pass
         return outcome
@@ -187,7 +185,7 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
 
 def run_worker_argv(argv: list[str]) -> None:
     bench = Benchmark(**json.loads(argv[2]))
-    model = Model.load(argv[3])
+    model = load_model(argv[3])
     run_benchmark(bench, model, Path(argv[4]), argv[5])
 
 
@@ -217,7 +215,7 @@ def main() -> int:
     configs, models = {}, {}
     for p in args.models:
         path = str(Path(p).resolve())
-        m = Model.load(path)
+        m = load_model(path)
         configs[m.name], models[m.name] = path, m
     suites = [s for s in args.suites.split(",") if s]
     attacks = [a for a in args.attacks.split(",") if a]
@@ -226,7 +224,7 @@ def main() -> int:
 
     if not args.process_only:
         benchmarks = expand(list(models.values()), suites, attacks, args.repeats, systems)
-        to_run, cached = split_cached(benchmarks, logdir, models)
+        to_run, cached = split_cached(benchmarks, logdir)
         max_workers = args.max_workers or min(max(math.ceil(len(to_run) / 4), 1), 512)
         print_plan(to_run, cached, models, logdir, max_workers)
         if args.plan_only:

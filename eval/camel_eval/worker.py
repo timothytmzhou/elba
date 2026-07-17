@@ -2,6 +2,7 @@
 # fresh no policy pass. +camel+secpol replays that recording under the policies.
 import os
 import tempfile
+from pathlib import Path
 
 import camel.models
 from camel.interpreter.interpreter import MetadataEvalMode
@@ -11,6 +12,7 @@ camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
 def run_camel(bench, model, logdir, benchmark_version):
+    from benchmark import result_path
     from run import run_agentdojo_task
 
     replay = bench.variant == "policy"
@@ -32,3 +34,10 @@ def run_camel(bench, model, logdir, benchmark_version):
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
     run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+
+    # camel writes under its own upstream pipeline name, copy it to ours
+    src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id
+           / bench.attack / f"{bench.injection_task_id}.json")
+    dst = result_path(bench, logdir)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(src.read_text())

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from scipy.stats import binomtest
 
-from benchmark import BENIGN, Benchmark, Model, Result, suite_tasks
+from benchmark import BENIGN, Benchmark, Model, Result, load_result, pipeline_name, suite_tasks
 
 SYSTEM_LABELS = {
     ("typeguard", "policy"): "TypeGuard",
@@ -62,11 +62,11 @@ def load_results(logdir: Path, models: dict[str, Model]) -> list[tuple[Benchmark
         rep = int(rep_dir.name[3:])
         for model in models.values():
             for system, variant in SYSTEM_LABELS:
-                pipeline = model.pipeline_name(system, variant)
-                for path in sorted((rep_dir / pipeline).glob("*/*/*/*.json")):
+                stem = Benchmark(system, variant, model.name, rep, "", "")
+                for path in sorted((rep_dir / pipeline_name(stem)).glob("*/*/*/*.json")):
                     bench = Benchmark(system, variant, model.name, rep, path.parts[-4],
                                       path.parts[-3], path.parts[-2], path.stem)
-                    if result := Result.load(path):
+                    if result := load_result(path):
                         records.append((bench, result))
     return records
 

@@ -17,7 +17,8 @@ EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
 from benchmark import (  # noqa: E402
-    AgentConfig, Benchmark, Model, REPO_ROOT, Result, expand, split_cached)
+    AgentConfig, Benchmark, Model, REPO_ROOT, Result, expand, pipeline_name, result_path,
+    slug, split_cached)
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
@@ -43,7 +44,7 @@ def configs_for(m: Model, tmp_path: Path) -> dict[str, str]:
 def test_expand_slack_counts():
     atoms = expand([model()], ["slack"], ["direct", "important_instructions"], repeats=1)
     assert len(atoms) == 4 * (21 + 210)
-    assert len({a.slug for a in atoms}) == len(atoms)
+    assert len({slug(a) for a in atoms}) == len(atoms)
 
 
 def test_expand_nonslack_has_no_typeguard_policy():
@@ -53,22 +54,21 @@ def test_expand_nonslack_has_no_typeguard_policy():
     assert tg == {"nopolicy"} and cm == {"policy", "nopolicy"}
 
 
-def test_pipeline_names_match_camel_convention():
-    m = model()
-    assert m.pipeline_name("camel", "policy") == "gpt-5.4-2026-03-05-high+camel+secpol"
-    assert m.pipeline_name("camel", "nopolicy") == "gpt-5.4-2026-03-05-high+camel"
-    assert m.pipeline_name("typeguard", "policy") == "typeguard-gpt-5.4-high"
+def test_pipeline_name_is_uniform():
+    b = Benchmark("camel", "policy", "gpt-5.4-high", 1, "slack", "user_task_0")
+    assert pipeline_name(b) == "camel-policy-gpt-5.4-high"
+    assert pipeline_name(Benchmark("typeguard", "nopolicy", "gpt-4o", 1, "slack", "t")) \
+        == "typeguard-nopolicy-gpt-4o"
 
 
 def test_split_cached(tmp_path):
     m = model()
-    models = {m.name: m}
     a1 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
     a2 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_1")
-    p = a1.result_path(tmp_path, m)
+    p = result_path(a1, tmp_path)
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps({"utility": True, "security": True}))
-    to_run, cached = split_cached([a1, a2], tmp_path, models)
+    to_run, cached = split_cached([a1, a2], tmp_path)
     assert cached == [a1] and to_run == [a2]
 
 
@@ -137,11 +137,11 @@ def test_worker_end_to_end(slack_run):
     models, logdir, report = slack_run
     assert report.completed == 2
     benign = json.loads(
-        (logdir / "rep1/typeguard-gpt-5.4-high/slack/user_task_0/none/none.json").read_text())
+        (logdir / "rep1/typeguard-policy-gpt-5.4-high/slack/user_task_0/none/none.json").read_text())
     assert benign["utility"] is True
     assert benign["tokens"] is None or "input" in benign["tokens"]
     attacked = json.loads(
-        (logdir / "rep1/typeguard-gpt-5.4-high/slack/user_task_0/"
+        (logdir / "rep1/typeguard-policy-gpt-5.4-high/slack/user_task_0/"
                   "important_instructions/injection_task_1.json").read_text())
     assert attacked["utility"] is True
     assert attacked["security"] is False  # stub never performs the injection
@@ -190,7 +190,7 @@ def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
     report = run_benchmarks([bench], configs_for(m, tmp_path), tmp_path / "logs", "v1.2.2",
                             timeout_s=5, max_workers=1, build=False)
-    result = json.loads(bench.result_path(tmp_path / "logs", m).read_text())
+    result = json.loads(result_path(bench, tmp_path / "logs").read_text())
     assert result["utility"] is False
     assert report.timeout == 1
 

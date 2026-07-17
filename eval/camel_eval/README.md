@@ -17,6 +17,11 @@ Both variants follow upstream's published methodology and names:
   quarantined LLM responses, so it costs no LLM calls. The runner therefore
   schedules `+camel+secpol` after `+camel`.
 
+Upstream writes its results under its own `+camel` / `+camel+secpol`
+pipeline names. The worker copies each result to our uniform
+`camel-<variant>-<model>` location, leaving the recording in place for the
+replayer, so the rest of the eval never needs to know CaMeL's naming.
+
 The only accommodations, both in `worker.py` and zero lines of CaMeL diff:
 `_is_oai_reasoning_model` is extended to recognize the `gpt-5` family, and
 the replayer's `logs/` recording root is provided as a symlink to the run's

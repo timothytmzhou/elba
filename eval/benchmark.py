@@ -54,23 +54,15 @@ class Model:
     camel_reasoning: bool = False
     attack_model_name: str = "AI assistant"
 
-    @staticmethod
-    def load(path: str | Path) -> "Model":
-        raw = json.loads(Path(path).read_text())
-        return Model(
-            name=raw["name"], camel_model=raw["camel_model"],
-            agent_config=AgentConfig(**raw["agent_config"]),
-            display=raw.get("display") or raw["name"],
-            camel_reasoning=raw.get("camel_reasoning", False),
-            attack_model_name=raw.get("attack_model_name", "AI assistant"))
 
-    def pipeline_name(self, system: str, variant: str) -> str:
-        # The camel names match upstream's own suffixes.
-        if system == "typeguard":
-            return f"typeguard{'' if variant == 'policy' else '-nopolicy'}-{self.name}"
-        model_id = self.camel_model.split(":")[1]
-        base = f"{model_id}-{self.agent_config.reasoningEffort}" if self.camel_reasoning else model_id
-        return base + ("+camel+secpol" if variant == "policy" else "+camel")
+def load_model(path: str | Path) -> Model:
+    raw = json.loads(Path(path).read_text())
+    return Model(
+        name=raw["name"], camel_model=raw["camel_model"],
+        agent_config=AgentConfig(**raw["agent_config"]),
+        display=raw.get("display") or raw["name"],
+        camel_reasoning=raw.get("camel_reasoning", False),
+        attack_model_name=raw.get("attack_model_name", "AI assistant"))
 
 
 @dataclass(frozen=True)
@@ -84,19 +76,24 @@ class Benchmark:
     attack: str = BENIGN
     injection_task_id: str = BENIGN
 
-    @property
-    def benign(self) -> bool:
-        return self.attack == BENIGN
 
-    @property
-    def slug(self) -> str:
-        return "-".join([self.system, self.variant, self.model, f"rep{self.rep}",
-                         self.suite, self.task_id, self.attack, self.injection_task_id])
+def is_benign(b: Benchmark) -> bool:
+    return b.attack == BENIGN
 
-    def result_path(self, logdir: Path, model: Model) -> Path:
-        pipeline = model.pipeline_name(self.system, self.variant)
-        return (logdir / f"rep{self.rep}" / pipeline / self.suite / self.task_id
-                / self.attack / f"{self.injection_task_id}.json")
+
+# Our result directory, one segment, the same shape for every system.
+def pipeline_name(b: Benchmark) -> str:
+    return f"{b.system}-{b.variant}-{b.model}"
+
+
+def slug(b: Benchmark) -> str:
+    return "-".join([pipeline_name(b), f"rep{b.rep}", b.suite, b.task_id,
+                     b.attack, b.injection_task_id])
+
+
+def result_path(b: Benchmark, logdir: Path) -> Path:
+    return (logdir / f"rep{b.rep}" / pipeline_name(b) / b.suite / b.task_id
+            / b.attack / f"{b.injection_task_id}.json")
 
 
 def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):
@@ -138,21 +135,21 @@ class Result:
     agent_transcript: str | None = None
     result_file: str = ""
 
-    @staticmethod
-    def load(path: Path) -> Result | None:
-        try:
-            r = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            return None
-        if r.get("utility") not in (True, False):
-            return None
-        final = next((blk.get("content") or blk.get("text", "")
-                      for m in reversed(r.get("messages") or [])
-                      if m.get("role") == "assistant"
-                      for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
-        return Result(r["utility"], r["security"], r.get("duration"), r.get("tokens"),
-                      r.get("error"), final, r.get("messages") or [],
-                      r.get("agent_transcript"), str(path))
+
+def load_result(path: Path) -> Result | None:
+    try:
+        r = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if r.get("utility") not in (True, False):
+        return None
+    final = next((blk.get("content") or blk.get("text", "")
+                  for m in reversed(r.get("messages") or [])
+                  if m.get("role") == "assistant"
+                  for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
+    return Result(r["utility"], r["security"], r.get("duration"), r.get("tokens"),
+                  r.get("error"), final, r.get("messages") or [],
+                  r.get("agent_transcript"), str(path))
 
 
 class Outcome(Enum):
@@ -166,11 +163,11 @@ class RunReport:
     timeout: int = 0
 
 
-def split_cached(benchmarks: list[Benchmark], logdir: Path,
-                 models: dict[str, Model]) -> tuple[list[Benchmark], list[Benchmark]]:
+def split_cached(benchmarks: list[Benchmark],
+                 logdir: Path) -> tuple[list[Benchmark], list[Benchmark]]:
     to_run, cached = [], []
     for b in benchmarks:
-        (cached if Result.load(b.result_path(logdir, models[b.model])) else to_run).append(b)
+        (cached if load_result(result_path(b, logdir)) else to_run).append(b)
     return to_run, cached
 
 
@@ -243,7 +240,7 @@ def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
 
 
 def print_plan(to_run, cached, models, logdir, max_workers) -> None:
-    counts = Counter((b.model, b.system, b.variant, b.suite, "benign" if b.benign else "attack")
+    counts = Counter((b.model, b.system, b.variant, b.suite, "benign" if is_benign(b) else "attack")
                      for b in to_run)
     header = f"{'model':<16}{'system':<11}{'variant':<10}{'suite':<11}{'benign':>7}{'attack':>7}"
     print("\n=== Run plan ===", header, "-" * len(header), sep="\n")
