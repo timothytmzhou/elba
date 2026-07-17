@@ -1,12 +1,16 @@
 {-# LANGUAGE Trustworthy #-}
 
 module Agents
-  ( Env
+  ( Config
+  , Env
   , mkAgent
+  , setContext
+  , subagent
   ) where
 
 import Control.Monad.Catch (try)
 import Data.Char (isAlpha)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.List (isPrefixOf)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -48,9 +52,9 @@ setEnv env tools = do
   sigs <- mapM (typeOf . parenIfOp . toolName) values
   pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
 
--- Plumbing the subagent wrapper needs, in scope unqualified like Prelude.
+-- In scope unqualified like Prelude, so emitted code can spawn subagents.
 baseModules :: [ModuleName]
-baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
+baseModules = ["Prelude", "Agents"]
 
 -- Ambient base vocabulary, qualified so name clashes are impossible.
 -- The system prompt lists these.
@@ -126,6 +130,26 @@ setupInterp env = do
   set [searchPath := []]
   set [languageExtensions := map (Hint.UnknownExtension . show) (extensions env)]
 
+-- The running agent's context for subagent. The interpreter loads its own
+-- copy of this module, so mkAgent seeds that copy's slot through the
+-- setContext handshake before running any code.
+{-# NOINLINE contextRef #-}
+contextRef :: IORef (Config, Env)
+contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run"))
+
+-- | Seeds the context subagent reads. mkAgent calls this through the
+-- interpreter so the write lands in the interpreted copy of this module.
+setContext :: Config -> Env -> IO ()
+setContext config env = writeIORef contextRef (config, env)
+
+-- | Spawns a nested agent on the running agent's context. Meant for
+-- interpreted code. Every spawn decrements maxDepth, which caps total
+-- nesting.
+subagent :: (Typeable a) => String -> String -> a
+subagent task input = unsafePerformIO $ do
+  (config, env) <- readIORef contextRef
+  pure (mkAgent config env (task ++ "\n<input>\n" ++ input ++ "\n</input>"))
+
 mkAgent :: forall a. (Typeable a) => Config -> Env -> String -> a
 mkAgent config _ _
   | LLM.maxDepth config <= 0 = error "Agents.mkAgent: recursion depth exceeded"
@@ -133,9 +157,14 @@ mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
     ask <- withSession config
     tools <- maybe (resolveTools env) pure (resolvedTools env)
-    result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
+    result <- unsafeRunInterpreterWithArgs ["-XSafe"] $ do
       setupInterp env
       typeEnv <- setEnv env tools
+      seed <- unsafeInterpret "setContext" "Config -> Env -> IO ()"
+      liftIO $
+        seed
+          config {maxDepth = LLM.maxDepth config - 1}
+          env {resolvedTools = Just tools}
       let ctx = buildContext requiredType typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
@@ -143,22 +172,21 @@ mkAgent config env userPrompt = unsafePerformIO $
       runAttempt lg ask code 0
     case result of
       Left interpErr -> error (show interpErr)
-      Right f -> pure (f config env {resolvedTools = Just tools})
+      Right v -> pure v
   where
-    requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
     -- Checked against the aliased spelling so only alias targets need scope.
-    wrapperType = "Config -> Env -> " ++ requiredType
+    requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
 
-    runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
+    runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter a
     runAttempt lg ask code attempt = do
-      result <- try (unsafeInterpret (wrapper code) wrapperType)
+      result <- try (unsafeInterpret code requiredType)
       case result of
-        Right f -> do
+        Right v -> do
           liftIO (logEvent lg Success)
-          pure f
+          pure v
         Left err -> handleFailure lg ask (applyAliases (typeAliases env) (formatErr err)) attempt
 
-    handleFailure :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
+    handleFailure :: Log -> (String -> IO String) -> String -> Int -> Interpreter a
     handleFailure lg ask errStr attempt
       | attempt < LLM.maxAttempts config - 1 = do
           liftIO (logEvent lg (Retry errStr))
@@ -168,14 +196,3 @@ mkAgent config env userPrompt = unsafePerformIO $
       | otherwise = do
           liftIO (logEvent lg (Failure errStr))
           error errStr
-
-    -- Trailing \n: the LLM emission is appended verbatim; without it, multi-line
-    -- code starts on our prefix line and breaks Haskell's offside rule.
-    -- Decrementing maxDepth on each recursive call caps total nesting.
-    wrapper =
-      (++)
-        "\\config env -> \
-        \let subagent :: Typeable a => String -> String -> a; \
-        \    subagent task input = mkAgent config{maxDepth = maxDepth config - 1} env \
-        \      (task ++ \"\\n<input>\\n\" ++ input ++ \"\\n</input>\") \
-        \in\n"
