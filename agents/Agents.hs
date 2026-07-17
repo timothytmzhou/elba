@@ -12,7 +12,7 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
-import Docs (ResolvedTool (..), resolveTools)
+import Docs (resolveTools)
 import Env
 import GHC.IO (unsafePerformIO)
 import LLM
@@ -132,7 +132,7 @@ mkAgent config _ _
 mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
     ask <- withSession config
-    tools <- resolveTools env
+    tools <- maybe (resolveTools env) pure (resolvedTools env)
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
       typeEnv <- setEnv env tools
@@ -143,7 +143,7 @@ mkAgent config env userPrompt = unsafePerformIO $
       runAttempt lg ask code 0
     case result of
       Left interpErr -> error (show interpErr)
-      Right f -> pure (f config env)
+      Right f -> pure (f config env {resolvedTools = Just tools})
   where
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
     -- Checked against the aliased spelling so only alias targets need scope.

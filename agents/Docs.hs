@@ -1,13 +1,9 @@
 module Docs
-  ( ResolvedTool (..),
-    resolveTools,
+  ( resolveTools,
   )
 where
 
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
-import Env (Env (..))
+import Env (Env (..), ResolvedTool (..))
 import GHC
   ( Ghc,
     TyThing (AConLike, AnId),
@@ -27,42 +23,17 @@ import GHC.Hs.DocString (renderHsDocString)
 import GHC.Paths (libdir)
 import GHC.Types.Name (Name, getOccString)
 import GHC.Utils.Logger (getLogger)
-import System.IO.Unsafe (unsafePerformIO)
-
-data ResolvedTool = ResolvedTool
-  { toolName :: String,
-    toolIsValue :: Bool,
-    toolDoc :: Maybe String
-  }
-
--- Interpreted agent code can spawn a subagent, which reuses the parent Env.
--- The cache turns that resolveTools call into a map lookup, so a second GHC
--- session never opens inside the hint session running the code.
-{-# NOINLINE cache #-}
-cache :: IORef (Map [String] [ResolvedTool])
-cache = unsafePerformIO (newIORef Map.empty)
 
 -- | Reads each module's exports and Haddock from its interface file, the
 -- mechanism behind GHCi's :doc command. Needs libraries built with -haddock.
 resolveTools :: Env -> IO [ResolvedTool]
-resolveTools env = do
-  let key = modules env
-  cached <- Map.lookup key <$> readIORef cache
-  case cached of
-    Just tools -> pure tools
-    Nothing -> do
-      tools <- resolve key
-      atomicModifyIORef' cache (\m -> (Map.insert key tools m, ()))
-      pure tools
-
-resolve :: [String] -> IO [ResolvedTool]
-resolve mods =
+resolveTools env =
   runGhc (Just libdir) $ do
     dflags <- getSessionDynFlags
     logger <- getLogger
     (dflags', _, _) <- parseDynamicFlags logger dflags []
     _ <- setSessionDynFlags dflags'
-    concat <$> mapM exportsOf mods
+    concat <$> mapM exportsOf (modules env)
 
 exportsOf :: String -> Ghc [ResolvedTool]
 exportsOf modname = do

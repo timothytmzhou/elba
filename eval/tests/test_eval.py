@@ -15,7 +15,7 @@ import pytest
 EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
-from benchmark import Benchmark, Model, expand, split_cached  # noqa: E402
+from benchmark import Benchmark, Model, REPO_ROOT, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
@@ -152,6 +152,29 @@ def test_processing_outputs(slack_run):
     assert "TypeGuard" in tex
     assert r"1/1 (100.0\%)" in tex
     assert " & 1/1 " in tex
+
+
+def test_subagent_recursion(tmp_path, agent_exe, mock_llm):
+    # The parent emission delegates to a subagent, whose own emission
+    # answers. Exercises the recursive mkAgent path where the resolved
+    # tools ride along in the Env instead of resolving again.
+    count = tmp_path / "calls"
+    mock_llm(f"""N=$(cat {count} 2>/dev/null || echo 0)
+echo $((N+1)) > {count}
+if [ "$N" = 0 ]; then cat <<'CODE'
+subagent "Return exactly the string hello." "" :: DC String
+CODE
+else cat <<'CODE'
+return "hello"
+CODE
+fi""")
+    proc = subprocess.run(
+        [agent_exe, "--suite", "slack", "--secure"],
+        input='{"prompt": "Delegate to a subagent."}\n',
+        capture_output=True, text=True, timeout=300, cwd=REPO_ROOT,
+        env=os.environ.copy())
+    assert json.loads(proc.stdout.splitlines()[0]) == {"done": "hello"}, proc.stdout
+    assert count.read_text().strip() == "2"
 
 
 def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
