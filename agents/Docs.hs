@@ -1,6 +1,3 @@
--- Resolves the exports of the Env's tool modules together with their
--- Haddock docs, which GHC stores in interface files under the -haddock
--- flag. This is the same mechanism behind GHCi's :doc command.
 module Docs
   ( ResolvedTool (..),
     resolveTools,
@@ -32,20 +29,20 @@ import GHC.Types.Name (Name, getOccString)
 import GHC.Utils.Logger (getLogger)
 import System.IO.Unsafe (unsafePerformIO)
 
--- | One exported name as resolved by the docs pass.
 data ResolvedTool = ResolvedTool
   { toolName :: String,
     toolIsValue :: Bool,
     toolDoc :: Maybe String
   }
 
--- Resolution is cached per module list. Subagents reuse their parent's
--- Env, so recursive mkAgent calls never open a second GHC session while
--- the interpreter session is live.
+-- Subagents reuse their parent's Env, so caching keeps recursive mkAgent
+-- calls from opening a second GHC session inside a live interpreter.
 {-# NOINLINE cache #-}
 cache :: IORef (Map [String] [ResolvedTool])
 cache = unsafePerformIO (newIORef Map.empty)
 
+-- | Reads each module's exports and Haddock from its interface file, the
+-- mechanism behind GHCi's :doc command. Needs libraries built with -haddock.
 resolveTools :: Env -> IO [ResolvedTool]
 resolveTools env = do
   let key = modules env

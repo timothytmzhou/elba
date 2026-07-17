@@ -18,8 +18,7 @@ REPO_ROOT = HERE.parents[1]
 CHECKOUT = REPO_ROOT / "camel"
 
 REPO_URL = "https://github.com/google-research/camel-prompt-injection.git"
-PATCHED = ["main.py", "src/camel/models.py",
-           "src/camel/pipeline_elements/privileged_llm.py"]
+PATCHED = ["src/camel/models.py", "src/camel/pipeline_elements/privileged_llm.py"]
 
 
 def ensure_checkout() -> Path:
@@ -27,8 +26,8 @@ def ensure_checkout() -> Path:
         print(f"[camel] cloning into {CHECKOUT}", flush=True)
         subprocess.run(["git", "clone", REPO_URL, str(CHECKOUT)], check=True)
     if subprocess.run(["git", "diff", "--quiet", "--", *PATCHED], cwd=CHECKOUT).returncode == 0:
-        print("[camel] applying changes.patch", flush=True)
-        subprocess.run(["git", "apply", "--3way", str(HERE / "changes.patch")],
+        print("[camel] applying camel.diff", flush=True)
+        subprocess.run(["git", "apply", "--3way", str(HERE / "camel.diff")],
                        cwd=CHECKOUT, check=True)
     env_file = CHECKOUT / ".env"
     if not env_file.exists():

@@ -1,11 +1,7 @@
 #!/bin/bash
-# Confirms the interpreted agent cannot reference IFC internals. The env
-# imports the tool modules whole, so nothing beyond their curated exports
-# resolves, and the TCB primitives live in unsafe modules the interpreter
-# could not import anyway. Each snippet is fed to the secure slack binary
-# as the model output. A benign snippet must run.
-#
-# Usage. cabal build agentdojo-slack-secure, then bash test_opacity.sh
+# Feeds snippets to the secure slack binary as the model output. Snippets
+# reaching IFC internals must be rejected by the typechecker, benign ones
+# must run. Build agentdojo-slack-secure first.
 
 set -uo pipefail
 BIN=$(cabal list-bin agentdojo-slack-secure | tail -1)

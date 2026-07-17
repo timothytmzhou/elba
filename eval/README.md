@@ -96,8 +96,8 @@ Drop a JSON into `configs/`:
 ```
 
 and add its price row to `pricing.json` if missing (the plan refuses to
-guess). Models unknown to CaMeL are registered at runtime via the
-`CAMEL_EXTRA_[REASONING_]MODELS` env hook our patch adds — no CaMeL edits.
+guess). Models unknown to CaMeL get one registration line in
+`camel_eval/camel.diff`.
 
 ## Prerequisites
 

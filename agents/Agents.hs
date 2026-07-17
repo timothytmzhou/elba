@@ -21,8 +21,7 @@ import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeInterpret, unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
 
--- TypeEnv: name -> (signature, optional docstring). Show formats each entry
--- as `name :: signature`, optionally followed by an indented doc.
+-- Tool name to signature and optional docstring, shown to the model.
 newtype TypeEnv = TypeEnv (Map String (String, Maybe String))
 
 instance Show TypeEnv where
@@ -53,9 +52,8 @@ setEnv env tools = do
 baseModules :: [ModuleName]
 baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
 
--- The agent's ambient language beyond Prelude. Pure standard base modules
--- are fine to expose because agent code is typechecked, and importing them
--- qualified rules out name clashes. The system prompt lists these.
+-- Ambient base vocabulary, qualified so name clashes are impossible.
+-- The system prompt lists these.
 qualifiedModules :: [ModuleName]
 qualifiedModules =
   [ "Control.Applicative"
@@ -75,8 +73,7 @@ qualifiedModules =
   , "Text.Read"
   ]
 
--- Wrap operator names in parens so they're valid in import lists and
--- in `typeOf` queries (e.g. `(%%)`, not `%%`).
+-- Wraps operator names in parens for import lists and typeOf queries.
 parenIfOp :: String -> String
 parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
 parenIfOp s = s
@@ -90,9 +87,7 @@ buildContext proxy aliases typeEnv task =
     , "Allowed functions: " ++ show typeEnv
     ]
 
--- | Rewrites each alias source string to its target. Types rendered from
--- TypeRep arrive with synonyms expanded, this restores the alias the
--- model is meant to see.
+-- | Rewrites alias sources to targets. TypeRep renders synonyms expanded.
 applyAliases :: [(String, String)] -> String -> String
 applyAliases aliases s0 = foldl (flip sub) s0 aliases
   where
@@ -113,11 +108,7 @@ retryMessage errStr =
     , "Re-emit a corrected Haskell expression of the required type."
     ]
 
--- | Strip a markdown code fence around the LLM's emission. If the response
--- contains lines whose first non-space chars are "```", return the content
--- between the first and second such lines. Otherwise return the input
--- unchanged. Handles ```haskell ... ```, bare ``` ... ```, and prose
--- surrounding the fenced block.
+-- | Strips a markdown code fence around the LLM's emission if present.
 stripFence :: String -> String
 stripFence s
   | not (any isFence ls) = s
@@ -155,8 +146,7 @@ mkAgent config env userPrompt = unsafePerformIO $
       Right f -> pure (f config env)
   where
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
-    -- The interpreter checks against the aliased spelling, so only the
-    -- alias targets need to be in scope, not their expansions.
+    -- Checked against the aliased spelling so only alias targets need scope.
     wrapperType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy (Config -> Env -> a))))
 
     runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)

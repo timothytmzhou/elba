@@ -1,89 +1,34 @@
-diff --git a/main.py b/main.py
-index b677afa..c740d6f 100644
---- a/main.py
-+++ b/main.py
-@@ -36,6 +36,8 @@ def main(
-     eval_mode: MetadataEvalMode = MetadataEvalMode.NORMAL,
-     q_llm: str | None = None,
-     user_tasks: list[str] | None = None,
-+    attack_name: str = "important_instructions",
-+    no_policy: bool = False,
- ):
-     """Example usage of the defense.
- 
-@@ -57,8 +59,6 @@ def main(
-         q_llm: what model to use as a quarantined llm. If None, the same as `model` is used.
-     """
- 
--    attack_name = "important_instructions"
--
-     suites = suites or ["workspace", "banking", "travel", "slack"]
-     total_utility_results = []
-     total_security_results = []
-@@ -75,6 +75,7 @@ def main(
-             ad_defense,
-             eval_mode,
-             q_llm,  # type: ignore
-+            no_policy=no_policy,
-         )
-         suite = get_suite("v1.2", suite_name)
-         attack = attacks.load_attack(attack_name, suite, tools_pipeline)
 diff --git a/src/camel/models.py b/src/camel/models.py
-index 7ebce22..31b0b8c 100644
+index 7ebce22..d6290f6 100644
 --- a/src/camel/models.py
 +++ b/src/camel/models.py
-@@ -30,7 +30,28 @@ _oai_thinking_models = {
+@@ -30,6 +30,7 @@ _oai_thinking_models = {
      "o3-mini-2025-01-31": "ChatGPT",
      "o1-2024-12-17": "ChatGPT",
      "codex-mini-latest": "ChatGPT",
 +    "gpt-5.4-2026-03-05": "ChatGPT",
  }
-+
-+
-+def _extra_models_from_env(var: str) -> dict[str, str]:
-+    """Register additional models without patching this file again.
-+
-+    The variable holds a comma-separated list of `model_id` or
-+    `model_id=Display Name` entries (display name defaults to "ChatGPT").
-+    Example: CAMEL_EXTRA_REASONING_MODELS="gpt-6-2026-12-01=ChatGPT".
-+    """
-+    entries = {}
-+    for item in os.environ.get(var, "").split(","):
-+        item = item.strip()
-+        if not item:
-+            continue
-+        model_id, _, display = item.partition("=")
-+        entries[model_id.strip()] = display.strip() or "ChatGPT"
-+    return entries
-+
-+
-+_oai_thinking_models |= _extra_models_from_env("CAMEL_EXTRA_REASONING_MODELS")
  _oai_thinking_models_with_effort = {
      f"{model}-{effort}": name for model, name in _oai_thinking_models.items() for effort in _thinking_efforts
- }
-@@ -47,8 +68,8 @@ _supported_model_names = {
-     "gpt-4o-mini-2024-07-18": "GPT-4",
+@@ -48,7 +49,7 @@ _supported_model_names = {
      "gpt-4.1-2025-04-14": "ChatGPT",
      "gpt-4.1-nano-2025-04-14": "ChatGPT",
--} | _oai_thinking_models_with_effort
+ } | _oai_thinking_models_with_effort
 -suffixes = ["", "+camel", "+camel+secpol", "+camel+secpol+strict"]
-+} | _oai_thinking_models_with_effort | _extra_models_from_env("CAMEL_EXTRA_MODELS")
 +suffixes = ["", "+camel", "+camel-nopolicy", "+camel+secpol", "+camel+secpol+strict"]
  
  CAMEL_MODEL_NAMES = {f"{model}{suffix}": name for model, name in _supported_model_names.items() for suffix in suffixes}
  
-@@ -61,7 +82,9 @@ _SECURITY_POLICY_ENGINES: dict[str, type[AgentDojoSecurityPolicyEngine]] = {
+@@ -61,7 +62,7 @@ _SECURITY_POLICY_ENGINES: dict[str, type[AgentDojoSecurityPolicyEngine]] = {
  
  
  def _is_oai_reasoning_model(model: str) -> bool:
 -    return "o4" in model or "o3" in model or "o1" in model or "codex" in model
-+    if any(extra in model for extra in _extra_models_from_env("CAMEL_EXTRA_REASONING_MODELS")):
-+        return True
 +    return "o4" in model or "o3" in model or "o1" in model or "codex" in model or "gpt-5" in model
  
  
  MODEL_NAMES.update(CAMEL_MODEL_NAMES)
-@@ -96,6 +119,7 @@ def make_tools_pipeline(
+@@ -96,6 +97,7 @@ def make_tools_pipeline(
      ad_defense: str | None,
      eval_mode: MetadataEvalMode,
      q_llm: KnownModelName | None,
@@ -91,14 +36,13 @@ index 7ebce22..31b0b8c 100644
  ) -> agent_pipeline.AgentPipeline:
      if "google" in model:
          # vertexai.init(project=os.getenv("GCP_PROJECT"), location=os.getenv("GCP_LOCATION"))
-@@ -196,18 +220,20 @@ def make_tools_pipeline(
+@@ -196,18 +198,19 @@ def make_tools_pipeline(
                  # Generates the code and writes it to `extra_args`
                  PrivilegedLLM(
                      llm,
 -                    ADNoSecurityPolicyEngine,
 +                    ADNoSecurityPolicyEngine if no_policy else engine,
                      q_llm or model,
-+                    max_attempts=1,
                  ),
              ]
          )

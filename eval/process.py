@@ -9,13 +9,12 @@ Reads only what the runner wrote. Writes under <logdir>/results/.
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 from pathlib import Path
 from statistics import NormalDist
 
-from experiment import ATTACKS, BENIGN, Model, SUITES, suite_tasks
+from experiment import BENIGN, Model, suite_tasks
 
 Z975 = NormalDist().inv_cdf(0.975)
 
@@ -267,19 +266,3 @@ def process(logdir, models, suites, attacks, repeats) -> Path:
     return outdir
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--logdir", required=True)
-    ap.add_argument("--models", nargs="+", required=True)
-    ap.add_argument("--suites", default=",".join(SUITES))
-    ap.add_argument("--attacks", default=",".join(ATTACKS))
-    ap.add_argument("--repeats", type=int, default=1)
-    args = ap.parse_args()
-    models = {m.name: m for m in map(Model.load, args.models)}
-    process(Path(args.logdir), models, args.suites.split(","),
-            [a for a in args.attacks.split(",") if a], args.repeats)
-    return 0
-
-
-if __name__ == "__main__":
-    main()

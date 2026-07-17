@@ -55,10 +55,8 @@ runAgentWith run tweak = do
 runInsecureAgent :: Env -> IO ()
 runInsecureAgent env = runAgentWith (\cfg prompt -> mkAgent cfg env prompt) id
 
--- | Runs the agent in the DC monad. The tweak lets a suite extend the
--- config, for example appending IFC guidance to the system prompt. The
--- alias keeps the prompt's required type spelled DC even though TypeRep
--- rendering expands the synonym.
+-- | The tweak extends the config, the alias keeps the required type
+-- spelled DC where TypeRep rendering would expand the synonym.
 runSecureAgent :: Env -> (Config -> Config) -> IO ()
 runSecureAgent env = runAgentWith run
   where
