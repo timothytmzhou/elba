@@ -157,7 +157,7 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
                                         stderr=subprocess.STDOUT, cwd=REPO_ROOT,
                                         start_new_session=True)
                 try:
-                    proc.wait(timeout=timeout_s + 120)
+                    proc.wait(timeout=timeout_s)
                 except subprocess.TimeoutExpired:
                     kill_group(proc)
                     proc.wait(timeout=10)
@@ -178,7 +178,8 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
             else:
                 done[status] += 1
             n = done["completed"] + done["timeout"] + len(done["crashed"])
-            print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] {status}: {slug}",
+            shout = status if status == "completed" else status.upper()
+            print(f"[{n}/{len(benchmarks)} {(time.time() - start) / 60:.1f}min] {shout}: {slug}",
                   flush=True)
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:

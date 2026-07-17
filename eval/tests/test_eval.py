@@ -166,7 +166,7 @@ def test_timeout_writes_failure(tmp_path):
                                 timeout_s=3, max_workers=1, build=False)
     result = json.loads(bench.result_path(tmp_path / "logs", models).read_text())
     assert result["utility"] is False
-    assert report["completed"] + report["timeout"] == 1
+    assert report["timeout"] == 1
 
 
 def test_suite_table_full_matrix(tmp_path):

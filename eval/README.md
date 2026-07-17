@@ -60,8 +60,9 @@ with its Haddock docstring in the prompt.
 Every task evaluation is independent ("embarrassingly parallel"): one OS
 process per evaluation, `--max-workers` defaults to `ceil(n/4)` so a full
 run takes about four sequential task-times. The per-task budget is 10
-minutes (`--timeout`), as in the paper; timed-out tasks are recorded as
-`utility=False, security=True` (AgentDojo's own convention for failures).
+minutes (`--timeout`, worker startup included); a timeout is printed to
+stdout and recorded as `utility=False, security=True` (AgentDojo's own
+convention for failures).
 
 | axis    | values                                                            |
 |---------|-------------------------------------------------------------------|
