@@ -123,6 +123,28 @@ def split_cached(atoms, logdir, models):
     return [a for a in atoms if a not in done], cached
 
 
+PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+PRICING_CACHE = EVAL_DIR / "pricing.json"
+
+
+def load_pricing() -> dict:
+    """OpenAI prices per million tokens, fetched once and cached gitignored."""
+    if PRICING_CACHE.exists():
+        return json.loads(PRICING_CACHE.read_text())
+    import time
+    import urllib.request
+
+    raw = json.load(urllib.request.urlopen(PRICING_URL, timeout=30))
+    models = {name: {"input": m["input_cost_per_token"] * 1e6,
+                     "output": m["output_cost_per_token"] * 1e6}
+              for name, m in raw.items()
+              if m.get("litellm_provider") == "openai"
+              and "input_cost_per_token" in m and "output_cost_per_token" in m}
+    pricing = {"source": PRICING_URL, "retrieved": time.strftime("%Y-%m-%d"), "models": models}
+    PRICING_CACHE.write_text(json.dumps(pricing, indent=1))
+    return pricing
+
+
 def price_for(camel_model: str, pricing: dict) -> dict:
     # Dated snapshots like gpt-5.4-2026-03-05 fall back to the gpt-5.4 row.
     model_id = camel_model.split(":")[1]
@@ -131,7 +153,7 @@ def price_for(camel_model: str, pricing: dict) -> dict:
         return table[model_id]
     matches = [k for k in table if model_id.startswith(k)]
     if not matches:
-        raise KeyError(f"no price for {model_id!r} in eval/pricing.json")
+        raise KeyError(f"no price for {model_id!r}. delete eval/pricing.json to refetch")
     return table[max(matches, key=len)]
 
 
@@ -152,7 +174,7 @@ def measured_tokens_per_task(logdir: Path) -> dict | None:
 
 
 def estimate_cost(atoms, models, logdir) -> tuple[float, str]:
-    pricing = json.loads((EVAL_DIR / "pricing.json").read_text())
+    pricing = load_pricing()
     measured = measured_tokens_per_task(logdir)
     per_task = measured or DEFAULT_TOKENS_PER_TASK
     basis = (f"measured over {measured['samples']} tasks" if measured

@@ -5,6 +5,7 @@ description = "AgentDojo evaluation harness for typed agents and the CaMeL basel
 requires-python = ">=3.11"
 dependencies = [
     "agentdojo>=0.1.35",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

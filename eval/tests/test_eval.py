@@ -15,10 +15,7 @@ sys.path.insert(0, str(EVAL_DIR))
 from experiment import Atom, Model, expand, split_cached  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from runner import run_atoms  # noqa: E402
-from process import (  # noqa: E402
-    clustered_utility_ci, newcombe_paired_diff, process,
-    suite_table, t_quantile_975, wilson_interval,
-)
+from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 
 
 def model(name="gpt-5.4-high") -> Model:
@@ -61,25 +58,6 @@ def test_split_cached(tmp_path):
     p.write_text(json.dumps({"utility": True, "security": True}))
     to_run, cached = split_cached([a1, a2], tmp_path, models)
     assert cached == [a1] and to_run == [a2]
-
-
-def test_t_quantile_matches_known_values():
-    for df, expected in [(5, 2.571), (10, 2.228), (20, 2.086), (100, 1.984)]:
-        assert abs(t_quantile_975(df) - expected) < 0.01
-
-
-def test_wilson_interval():
-    lo, hi = wilson_interval(105, 105)
-    assert hi == 100.0 and 95.0 < lo < 97.5
-    lo, hi = wilson_interval(0, 105)
-    assert lo == 0.0 and hi < 5.0
-
-
-def test_clustered_utility_ci():
-    n, total, pct, hw = clustered_utility_ci([[True]] * 15 + [[False]] * 6)
-    assert (n, total) == (15, 21) and abs(pct - 71.43) < 0.01 and 0 < hw < 25
-    n, total, pct, _ = clustered_utility_ci([[True, True, False]] * 10)
-    assert (n, total) == (20, 30) and abs(pct - 66.67) < 0.01
 
 
 def test_newcombe_paired():
@@ -167,8 +145,8 @@ def test_processing_outputs(slack_run):
     tex = (outdir / "table_slack.tex").read_text()
     assert r"\begin{table}" in tex and r"\toprule" in tex
     assert "TypeGuard" in tex
-    assert r"1/1 (100.0\%" in tex
-    assert "1/1 [" in tex
+    assert r"1/1 (100.0\%)" in tex
+    assert " & 1/1 " in tex
 
 
 def test_timeout_writes_failure(tmp_path):
@@ -212,6 +190,5 @@ def test_suite_table_full_matrix(tmp_path):
     # all four system rows including the no policy under attack cells
     for label in ["TypeGuard", "TypeGuard (no policy)", "CaMeL", "CaMeL (no policy)"]:
         assert label in tex
-    assert r"105/105 (100.0\%" in tex
-    assert "105/105 [96." in tex
-    assert "0/105 [0.0," in tex
+    assert r"105/105 (100.0\%)" in tex
+    assert " & 0/105 " in tex

@@ -11,3 +11,4 @@ logs/
 *.pyc
 camel/
 .notes/
+eval/pricing.json

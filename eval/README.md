@@ -9,8 +9,9 @@ python eval/run.py --models eval/configs/*.json
 ```
 
 It first prints the plan (how many task evaluations will run, and a cost
-estimate priced from [OpenAI's published rates](https://platform.openai.com/docs/pricing),
-pinned in `pricing.json`), asks for confirmation (`--yes` to skip), runs every
+estimate priced from [LiteLLM's price table](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json),
+fetched once into a gitignored `pricing.json`), asks for confirmation
+(`--yes` to skip), runs every
 remaining evaluation in parallel, then processes the results. Finished
 evaluations are cached by result file, so rerunning resumes.
 
@@ -27,13 +28,11 @@ python eval/run.py --models eval/configs/gpt5.4-high.json --suites slack
   injection), utility and security verdicts, duration, token usage (measured
   from the agent's `llm` logs), the agent's final output and full message
   log, error if any, and paths to the raw transcript and result file.
-- **`table_<suite>.tex`** — the paste-ready paper table for each suite, in
-  the format of Garby et al. (arXiv:2602.20064, Table 1): system x model
-  rows; utility cells `n/N (p% ± hw)` with a clustered Student-t 95% CI over
-  sampling units; security cells `n/N [lo, hi]` with a 95% Wilson score
-  interval; per-attack columns.
-- **`confidence_intervals.tex`** — TypeGuard − CaMeL paired-difference CIs
-  per setting (Newcombe's score interval; the preprint's Table 3).
+- **`table_<suite>.tex`** — the paste-ready paper table for each suite:
+  system x model rows, utility cells `n/N (p%)`, security cells `n/N`
+  (pairs that resisted), per-attack columns.
+- **`confidence_intervals.tex`** — the appendix table: TypeGuard − CaMeL
+  paired-difference 95% CIs per setting (Newcombe's method 10).
 
 A plain-text summary of the same numbers is also printed to the terminal.
 
@@ -47,7 +46,6 @@ experiment.py  what to run: model configs, run matrix, plan + cost estimate
 bridge.py      run one AgentDojo task through the Haskell agent binary
 runner.py      launch every atom in parallel with per-task timeouts
 process.py     data processing: dump.jsonl, statistics, LaTeX tables
-pricing.json   OpenAI published prices for every model on the pricing page
 configs/       one JSON per model — pass any subset via --models
 camel_eval/    self-contained CaMeL baseline (checkout, patch, worker)
 stub_agent.py  scripted fake agent; lets tests run the whole pipeline
@@ -95,9 +93,9 @@ Drop a JSON into `configs/`:
 }
 ```
 
-and add its price row to `pricing.json` if missing (the plan refuses to
-guess). Models unknown to CaMeL get one registration line in
-`camel_eval/camel.diff`.
+(the plan refuses to guess prices for unknown models, delete
+`eval/pricing.json` to refetch). Models unknown to CaMeL get one
+registration line in `camel_eval/camel.diff`.
 
 ## Prerequisites
 

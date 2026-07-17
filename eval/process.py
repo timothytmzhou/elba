@@ -12,11 +12,10 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from statistics import NormalDist
+
+from scipy.stats import binomtest
 
 from experiment import BENIGN, Model, suite_tasks
-
-Z975 = NormalDist().inv_cdf(0.975)
 
 SYSTEM_LABELS = {
     ("typeguard", "policy"): "TypeGuard",
@@ -28,49 +27,15 @@ ROW_ORDER = list(SYSTEM_LABELS)
 ATTACK_LABELS = {"direct": "Direct", "important_instructions": r"Imp.\ Instr."}
 
 
-def t_quantile_975(df: int) -> float:
-    # Cornish Fisher expansion, accurate to about 1e-3 for df at least 5.
-    if df <= 0:
-        return float("nan")
-    z = Z975
-    return (z + (z**3 + z) / (4 * df)
-            + (5 * z**5 + 16 * z**3 + 3 * z) / (96 * df**2)
-            + (3 * z**7 + 19 * z**5 + 17 * z**3 - 15 * z) / (384 * df**3))
-
-
-def clustered_utility_ci(unit_outcomes: list[list[bool]]):
-    """Returns successes, trials, mean percent, and CI half width in points.
-
-    Each unit is averaged over its repetitions and the Student t interval is
-    taken over units. This is the clustered estimator of the reference paper.
-    """
-    n_units = len(unit_outcomes)
-    successes = sum(sum(reps) for reps in unit_outcomes)
-    trials = sum(len(reps) for reps in unit_outcomes)
-    means = [sum(reps) / len(reps) for reps in unit_outcomes]
-    mean = sum(means) / n_units
-    if n_units < 2:
-        return successes, trials, 100 * mean, float("nan")
-    var = sum((m - mean) ** 2 for m in means) / (n_units - 1)
-    hw = t_quantile_975(n_units - 1) * math.sqrt(var / n_units) * 100
-    return successes, trials, 100 * mean, hw
-
-
-def wilson_interval(successes: int, trials: int):
-    if trials == 0:
-        return float("nan"), float("nan")
-    z2 = Z975**2
-    p = successes / trials
-    denom = 1 + z2 / trials
-    center = (p + z2 / (2 * trials)) / denom
-    half = Z975 * math.sqrt(p * (1 - p) / trials + z2 / (4 * trials**2)) / denom
-    return 100 * max(center - half, 0), 100 * min(center + half, 1)
+def _wilson(successes: int, trials: int):
+    ci = binomtest(successes, trials).proportion_ci(method="wilson")
+    return ci.low, ci.high
 
 
 def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
     """95 percent CI for a paired proportion difference in points.
 
-    Newcombe 1998 method 10.
+    Newcombe 1998 method 10, built on Wilson intervals.
     """
     n = len(pairs)
     a = sum(1 for x, y in pairs if x and y)
@@ -79,8 +44,8 @@ def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
     d = n - a - b - c
     p1, p2 = (a + b) / n, (a + c) / n
     diff = p1 - p2
-    l1, u1 = (x / 100 for x in wilson_interval(a + b, n))
-    l2, u2 = (x / 100 for x in wilson_interval(a + c, n))
+    l1, u1 = _wilson(a + b, n)
+    l2, u2 = _wilson(a + c, n)
     prod = (a + b) * (c + d) * (a + c) * (b + d)
     if prod == 0:
         phi = 0.0
@@ -129,48 +94,36 @@ def _by(records, **filters):
     return [r for r in records if all(r[k] == v for k, v in filters.items())]
 
 
-def _units(records, key) -> list[list[bool]]:
-    units: dict = {}
-    for r in records:
-        units.setdefault(key(r), []).append(r)
-    return [[x["utility"] for x in sorted(v, key=lambda x: x["rep"])] for _, v in sorted(units.items())]
-
-
-def utility_cell(records, key) -> str:
+def utility_cell(records) -> str:
     if not records:
         return "--"
-    n, total, pct, hw = clustered_utility_ci(_units(records, key))
-    hw_s = "" if math.isnan(hw) else rf" $\pm$ {hw:.1f}"
-    return rf"{n}/{total} ({pct:.1f}\%{hw_s})"
+    n = sum(1 for r in records if r["utility"])
+    return rf"{n}/{len(records)} ({100 * n / len(records):.1f}\%)"
 
 
 def security_cell(records) -> str:
     if not records:
         return "--"
     resisted = sum(1 for r in records if not r["security"])  # security True means the attack won
-    lo, hi = wilson_interval(resisted, len(records))
-    return rf"{resisted}/{len(records)} [{lo:.1f}, {hi:.1f}]"
+    return rf"{resisted}/{len(records)}"
 
 
 def row_cells(records, system, variant, model, suite, attacks) -> list[str] | None:
     recs = _by(records, system=system, variant=variant, model=model.name, suite=suite)
     if not recs:
         return None
-    cells = [utility_cell(_by(recs, attack=BENIGN), lambda r: r["task"])]
-    cells += [utility_cell(_by(recs, attack=a), lambda r: (r["task"], r["injection_task"]))
-              for a in attacks]
+    cells = [utility_cell(_by(recs, attack=BENIGN))]
+    cells += [utility_cell(_by(recs, attack=a)) for a in attacks]
     cells += [security_cell(_by(recs, attack=a)) for a in attacks]
     return cells
 
 
 FOOTNOTES = [
     r"\begin{minipage}{\linewidth}\smallskip\footnotesize",
-    r"\textsuperscript{\dag} Utility. User tasks completed correctly. Safe and Attacked denote "
-    r"utility without and with injected attacks. Parentheses give the mean with a 95\% "
-    r"confidence interval (Student $t$), taking the user task (Safe) or task and injection pair "
-    r"(Attacked) as the sampling unit, each averaged over its $k$ repetitions.\\",
+    r"\textsuperscript{\dag} Utility. User tasks completed correctly, without (Safe) and with "
+    r"(Attacked) injected attacks.\\",
     r"\textsuperscript{\ddag} Security. Task and injection pairs that resisted the attack, per "
-    r"injection attack. Brackets give a 95\% Wilson score interval at the pair level.",
+    r"injection attack. Paired confidence intervals are reported in the appendix.",
     r"\end{minipage}",
 ]
 
@@ -258,7 +211,7 @@ def process(logdir, models, suites, attacks, repeats) -> Path:
                 for model in models.values():
                     cells = row_cells(records, system, variant, model, suite, attacks)
                     if cells:
-                        row = (c.replace(r"\%", "%").replace(r"$\pm$", "±") for c in cells)
+                        row = (c.replace(r"\%", "%") for c in cells)
                         print(f"  {SYSTEM_LABELS[system, variant] + '/' + model.display:<36}"
                               + "".join(f"{c:<26}" for c in row))
     (outdir / "confidence_intervals.tex").write_text(ci_table(records, suites, models, attacks))
