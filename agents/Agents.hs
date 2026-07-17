@@ -40,13 +40,40 @@ instance Show TypeEnv where
           ++ "\n"
           ++ unlines ["    " ++ ln | ln <- lines doc]
 
-setEnv :: Env -> [ResolvedTool] -> [ModuleName] -> Interpreter TypeEnv
-setEnv env tools baseModules = do
-  setImportsF
+setEnv :: Env -> [ResolvedTool] -> Interpreter TypeEnv
+setEnv env tools = do
+  setImportsF $
     [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
+      ++ [ModuleImport m (QualifiedAs Nothing) NoImportList | m <- qualifiedModules]
   let values = [t | t <- tools, toolIsValue t]
   sigs <- mapM (typeOf . parenIfOp . toolName) values
   pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
+
+-- Plumbing the subagent wrapper needs, in scope unqualified like Prelude.
+baseModules :: [ModuleName]
+baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
+
+-- The agent's ambient language beyond Prelude. Pure standard base modules
+-- are fine to expose because agent code is typechecked, and importing them
+-- qualified rules out name clashes. The system prompt lists these.
+qualifiedModules :: [ModuleName]
+qualifiedModules =
+  [ "Control.Applicative"
+  , "Control.Monad"
+  , "Data.Bifunctor"
+  , "Data.Char"
+  , "Data.Either"
+  , "Data.Foldable"
+  , "Data.Function"
+  , "Data.Functor"
+  , "Data.List"
+  , "Data.Maybe"
+  , "Data.Ord"
+  , "Data.Traversable"
+  , "Data.Tuple"
+  , "Text.Printf"
+  , "Text.Read"
+  ]
 
 -- Wrap operator names in parens so they're valid in import lists and
 -- in `typeOf` queries (e.g. `(%%)`, not `%%`).
@@ -117,7 +144,7 @@ mkAgent config env userPrompt = unsafePerformIO $
     tools <- resolveTools env
     result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
       setupInterp env
-      typeEnv <- setEnv env tools baseModules
+      typeEnv <- setEnv env tools
       let ctx = buildContext (Proxy :: Proxy a) (typeAliases env) typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
@@ -127,31 +154,6 @@ mkAgent config env userPrompt = unsafePerformIO $
       Left interpErr -> error (show interpErr)
       Right f -> pure (f config env)
   where
-    -- The agent's ambient language. Pure standard base modules are fine to
-    -- expose because agent code is typechecked, the limit is name clashes.
-    baseModules =
-      [ "Prelude"
-      , "Control.Applicative"
-      , "Control.Monad"
-      , "Data.Bifunctor"
-      , "Data.Char"
-      , "Data.Either"
-      , "Data.Foldable"
-      , "Data.Function"
-      , "Data.Functor"
-      , "Data.List"
-      , "Data.Maybe"
-      , "Data.Ord"
-      , "Data.Traversable"
-      , "Data.Tuple"
-      , "Text.Printf"
-      , "Text.Read"
-      , -- plumbing the subagent wrapper needs
-        "LLM"
-      , "Agents"
-      , "Data.Typeable"
-      , "Language.Haskell.TH.Syntax"
-      ]
     requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
     -- The interpreter checks against the aliased spelling, so only the
     -- alias targets need to be in scope, not their expansions.
