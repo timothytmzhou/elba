@@ -7,7 +7,6 @@ builds pipelines inside the checkout's own venv.
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
@@ -36,7 +35,8 @@ def ensure_checkout() -> Path:
     return CHECKOUT
 
 
-def worker_cmd(spec: dict) -> list[str]:
+def worker_cmd(worker_args: list[str]) -> list[str]:
+    # worker_args is [worker, benchmark_json, logdir, benchmark_version]
     uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
     return [uv, "run", "--project", str(CHECKOUT), "--env-file", str(CHECKOUT / ".env"),
-            "python", str(HERE.parent / "run.py"), "worker", json.dumps(spec)]
+            "python", str(HERE.parent / "run.py"), *worker_args]

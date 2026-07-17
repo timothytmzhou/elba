@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 
@@ -63,9 +63,11 @@ class Model:
 
 @dataclass(frozen=True)
 class Benchmark:
+    """One task evaluation. Carries its own Model, so it fully describes what
+    to run and can serialize itself to a worker."""
     system: str
     variant: str
-    model: str
+    model: Model
     rep: int
     suite: str
     task_id: str
@@ -77,14 +79,25 @@ class Benchmark:
         return self.attack == BENIGN
 
     @property
+    def pipeline_name(self) -> str:
+        return self.model.pipeline_name(self.system, self.variant)
+
+    @property
     def slug(self) -> str:
-        return "-".join([self.system, self.variant, self.model, f"rep{self.rep}",
+        return "-".join([self.system, self.variant, self.model.name, f"rep{self.rep}",
                          self.suite, self.task_id, self.attack, self.injection_task_id])
 
-    def result_path(self, logdir: Path, models: dict[str, Model]) -> Path:
-        pipeline = models[self.model].pipeline_name(self.system, self.variant)
-        return (logdir / f"rep{self.rep}" / pipeline / self.suite / self.task_id
+    def result_path(self, logdir: Path) -> Path:
+        return (logdir / f"rep{self.rep}" / self.pipeline_name / self.suite / self.task_id
                 / self.attack / f"{self.injection_task_id}.json")
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self))
+
+    @staticmethod
+    def from_json(s: str) -> Benchmark:
+        d = json.loads(s)
+        return Benchmark(model=Model(**d.pop("model")), **d)
 
 
 def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):
@@ -104,7 +117,7 @@ def expand(models, suites, attacks, repeats, systems=("typeguard", "camel")) -> 
                             and suite not in TYPEGUARD_POLICY_SUITES else ["policy", "nopolicy"])
                 for variant in variants:
                     for rep in range(1, repeats + 1):
-                        base = dict(system=system, variant=variant, model=model.name,
+                        base = dict(system=system, variant=variant, model=model,
                                     rep=rep, suite=suite)
                         benchmarks += [Benchmark(task_id=ut, **base) for ut in user_tasks]
                         benchmarks += [Benchmark(task_id=ut, attack=a, injection_task_id=it, **base)
@@ -154,10 +167,11 @@ class RunReport:
     timeout: int = 0
 
 
-def split_cached(benchmarks, logdir, models):
-    cached = [b for b in benchmarks if Result.load(b.result_path(logdir, models))]
-    done = set(cached)
-    return [b for b in benchmarks if b not in done], cached
+def split_cached(benchmarks, logdir):
+    to_run, cached = [], []
+    for b in benchmarks:
+        (cached if Result.load(b.result_path(logdir)) else to_run).append(b)
+    return to_run, cached
 
 
 PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -210,7 +224,7 @@ def measured_tokens_per_task(logdir: Path) -> dict | None:
     return {"input": total["input"] // n, "output": total["output"] // n, "samples": n}
 
 
-def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
+def estimate_cost(benchmarks, logdir) -> tuple[float, str]:
     pricing = load_pricing()
     measured = measured_tokens_per_task(logdir)
     per_task = measured or DEFAULT_TOKENS_PER_TASK
@@ -221,15 +235,15 @@ def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
         # camel policy replays the recorded run and costs no LLM calls
         if b.system == "camel" and b.variant == "policy":
             continue
-        price = price_for(models[b.model].camel_model, pricing)
+        price = price_for(b.model.camel_model, pricing)
         mult = CAMEL_TOKEN_MULTIPLIER if b.system == "camel" else 1.0
         cost += mult * (per_task["input"] / 1e6 * price["input"]
                         + per_task["output"] / 1e6 * price["output"])
     return cost, f"{basis}. prices from {pricing['source']} retrieved {pricing['retrieved']}"
 
 
-def print_plan(to_run, cached, models, logdir, max_workers) -> None:
-    counts = Counter((b.model, b.system, b.variant, b.suite, "benign" if b.benign else "attack")
+def print_plan(to_run, cached, logdir, max_workers) -> None:
+    counts = Counter((b.model.name, b.system, b.variant, b.suite, "benign" if b.benign else "attack")
                      for b in to_run)
     header = f"{'model':<16}{'system':<11}{'variant':<10}{'suite':<11}{'benign':>7}{'attack':>7}"
     print("\n=== Run plan ===", header, "-" * len(header), sep="\n")
@@ -238,7 +252,7 @@ def print_plan(to_run, cached, models, logdir, max_workers) -> None:
         a = counts.get((model, system, variant, suite, "attack"), 0)
         print(f"{model:<16}{system:<11}{variant:<10}{suite:<11}{b:>7}{a:>7}")
     print("-" * len(header))
-    cost, basis = estimate_cost(to_run, models, logdir)
+    cost, basis = estimate_cost(to_run, logdir)
     print(f"To run : {len(to_run)} task evaluations ({len(cached)} cached, skipped)")
     print(f"Cost   : ~${cost:,.0f}  [{basis}]")
     print(f"Wall   : ~{-(-len(to_run) // max(max_workers, 1))} task-times "

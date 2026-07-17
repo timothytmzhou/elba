@@ -14,16 +14,16 @@ _upstream = camel.models._is_oai_reasoning_model
 camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
-def make_pipeline(spec: dict):
-    replay = spec["variant"] == "policy"
+def make_pipeline(bench, logdir):
+    replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
-        spec["camel_model"],
+        bench.model.camel_model,
         False,  # use_original
         replay,  # replay_with_policies
-        spec["attack"] if spec["attack"] != "none" else "important_instructions",
-        spec.get("reasoning_effort") or "medium",
+        bench.attack if bench.attack != "none" else "important_instructions",
+        bench.model.agent_config.get("reasoningEffort") or "medium",
         None,  # thinking_budget_tokens
-        spec["suite"],
+        bench.suite,
         None,  # ad_defense
         MetadataEvalMode.NORMAL,
         None,  # q_llm
@@ -31,6 +31,6 @@ def make_pipeline(spec: dict):
     if replay:
         # the replayer reads recordings from logs/ relative to cwd
         tmp = tempfile.mkdtemp()
-        os.symlink(spec["logdir"], os.path.join(tmp, "logs"))
+        os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
     return pipeline

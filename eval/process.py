@@ -67,7 +67,7 @@ def load_results(logdir: Path, models: dict[str, Model]) -> list[tuple[Benchmark
             for system, variant in SYSTEM_LABELS:
                 pipeline = model.pipeline_name(system, variant)
                 for path in sorted((rep_dir / pipeline).glob("*/*/*/*.json")):
-                    bench = Benchmark(system, variant, model.name, rep, path.parts[-4],
+                    bench = Benchmark(system, variant, model, rep, path.parts[-4],
                                       path.parts[-3], path.parts[-2], path.stem)
                     if result := Result.load(path):
                         records.append((bench, result))
@@ -94,7 +94,7 @@ def security_cell(records) -> str:
 
 
 def row_cells(records, system, variant, model, suite, attacks) -> list[str] | None:
-    recs = _by(records, system=system, variant=variant, model=model.name, suite=suite)
+    recs = _by(records, system=system, variant=variant, model=model, suite=suite)
     if not recs:
         return None
     cells = [utility_cell(_by(recs, attack=BENIGN))]
@@ -170,9 +170,9 @@ def ci_table(records, suites, models, attacks) -> str:
             for setting, attack, variant in settings:
                 key = lambda b: (b.task_id, b.injection_task_id, b.rep)
                 tg = {key(b): r.utility for b, r in _by(records, system="typeguard",
-                      variant=variant, model=model.name, suite=suite, attack=attack)}
+                      variant=variant, model=model, suite=suite, attack=attack)}
                 cm = {key(b): r.utility for b, r in _by(records, system="camel",
-                      variant=variant, model=model.name, suite=suite, attack=attack)}
+                      variant=variant, model=model, suite=suite, attack=attack)}
                 common = sorted(set(tg) & set(cm))
                 if not common:
                     continue

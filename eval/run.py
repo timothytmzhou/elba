@@ -53,21 +53,22 @@ def _llm_token_usage(llm_user_dir: Path) -> dict | None:
         return None
 
 
-def _pipeline(spec: dict, private: Path):
-    if "camel_model" in spec:
+def _pipeline(bench: Benchmark, logdir: Path, exe: str, private: Path):
+    if bench.system == "camel":
         from camel_eval.worker import make_pipeline
 
-        return make_pipeline(spec)
+        return make_pipeline(bench, logdir)
     from bridge import HaskellAgentPipeline
 
     private.mkdir(parents=True, exist_ok=True)
     config = private / "config.json"
-    config.write_text(json.dumps(spec["agent_config"]))
-    return HaskellAgentPipeline(spec["exe"], spec["pipeline_name"], str(config),
+    config.write_text(json.dumps(bench.model.agent_config))
+    cmd = [exe, "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
+    return HaskellAgentPipeline(cmd, bench.pipeline_name, str(config),
                                 str(private / "transcript.jsonl"), private / "llm")
 
 
-def run_benchmark(spec: dict) -> None:
+def run_benchmark(bench: Benchmark, logdir: Path, benchmark_version: str, exe: str = None) -> None:
     """Run one benchmark in this process and write its result."""
     from agentdojo.attacks.attack_registry import load_attack
     from agentdojo.benchmark import (
@@ -78,37 +79,34 @@ def run_benchmark(spec: dict) -> None:
     from agentdojo.task_suite.load_suites import get_suite
 
     TaskResults.model_rebuild()
-    logdir = Path(spec["logdir"])
+    rep_dir = logdir / f"rep{bench.rep}"
     # important_instructions embeds a model name matched against MODEL_NAMES
-    MODEL_NAMES.setdefault(spec["pipeline_name"], spec["attack_model_name"])
-    MODEL_NAMES.setdefault(spec["pipeline_name"].removesuffix("+secpol"),
-                           spec["attack_model_name"])
+    MODEL_NAMES.setdefault(bench.pipeline_name, bench.model.attack_model_name)
+    MODEL_NAMES.setdefault(bench.pipeline_name.removesuffix("+secpol"), bench.model.attack_model_name)
 
-    suite = get_suite(spec["benchmark_version"], spec["suite"])
-    slug = "-".join([spec["suite"], spec["task_id"], spec["attack"], spec["injection_task_id"]])
-    private = logdir / spec["pipeline_name"] / ".agent" / slug
-    pipeline = _pipeline(spec, private)
-    assert pipeline.name == spec["pipeline_name"], pipeline.name
+    suite = get_suite(benchmark_version, bench.suite)
+    private = rep_dir / bench.pipeline_name / ".agent" / bench.slug
+    pipeline = _pipeline(bench, logdir, exe, private)
+    assert pipeline.name == bench.pipeline_name, pipeline.name
 
-    with OutputLogger(str(logdir)):
-        task = suite.get_user_task_by_id(spec["task_id"])
-        if spec["attack"] == "none":
-            run_task_without_injection_tasks(suite, pipeline, task, logdir, force_rerun=False,
-                                             benchmark_version=spec["benchmark_version"])
+    with OutputLogger(str(rep_dir)):
+        task = suite.get_user_task_by_id(bench.task_id)
+        if bench.benign:
+            run_task_without_injection_tasks(suite, pipeline, task, rep_dir, force_rerun=False,
+                                             benchmark_version=benchmark_version)
         else:
-            attack = load_attack(spec["attack"], suite, pipeline)
-            run_task_with_injection_tasks(suite, pipeline, task, attack, logdir, force_rerun=False,
-                                          injection_tasks=[spec["injection_task_id"]],
-                                          benchmark_version=spec["benchmark_version"])
+            attack = load_attack(bench.attack, suite, pipeline)
+            run_task_with_injection_tasks(suite, pipeline, task, attack, rep_dir, force_rerun=False,
+                                          injection_tasks=[bench.injection_task_id],
+                                          benchmark_version=benchmark_version)
 
-    if "exe" in spec:
-        result_path = (logdir / spec["pipeline_name"] / spec["suite"] / spec["task_id"]
-                       / spec["attack"] / f"{spec['injection_task_id']}.json")
-        result = json.loads(result_path.read_text())
+    if bench.system == "typeguard":
+        path = bench.result_path(logdir)
+        result = json.loads(path.read_text())
         result["tokens"] = _llm_token_usage(private / "llm")
         result["agent_transcript"] = str(private / "transcript.jsonl")
-        result_path.write_text(json.dumps(result))
-    print(f"[done] {slug}", flush=True)
+        path.write_text(json.dumps(result))
+    print(f"[done] {bench.slug}", flush=True)
 
 
 def typeguard_exe(build: bool = True) -> str:
@@ -119,27 +117,11 @@ def typeguard_exe(build: bool = True) -> str:
                                    text=True).strip().splitlines()[-1]
 
 
-def _spec(bench, model, logdir, benchmark_version, exe) -> dict:
-    spec = {
-        "suite": bench.suite, "task_id": bench.task_id, "attack": bench.attack,
-        "injection_task_id": bench.injection_task_id, "variant": bench.variant,
-        "benchmark_version": benchmark_version, "logdir": str(logdir / f"rep{bench.rep}"),
-        "pipeline_name": model.pipeline_name(bench.system, bench.variant),
-        "attack_model_name": model.attack_model_name,
-    }
+def _worker_cmd(bench: Benchmark, logdir: Path, benchmark_version: str, exe: str) -> list[str]:
+    args = ["worker", bench.to_json(), str(logdir), benchmark_version]
     if bench.system == "typeguard":
-        cmd = [exe, "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
-        spec |= {"exe": cmd, "agent_config": model.agent_config}
-    else:
-        spec |= {"camel_model": model.camel_model,
-                 "reasoning_effort": model.agent_config.get("reasoningEffort")}
-    return spec
-
-
-def _worker_cmd(spec: dict) -> list[str]:
-    if "exe" in spec:
-        return [sys.executable, __file__, "worker", json.dumps(spec)]
-    return camel_eval.worker_cmd(spec)
+        return [sys.executable, __file__, *args, exe]
+    return camel_eval.worker_cmd(args)
 
 
 def run_with_timeout(cmd: list[str], log: Path, timeout_s: int) -> Outcome:
@@ -159,26 +141,26 @@ def run_with_timeout(cmd: list[str], log: Path, timeout_s: int) -> Outcome:
             return Outcome.TIMEOUT
 
 
-def _record_timeout(bench: Benchmark, logdir: Path, models: dict, timeout_s: int) -> None:
-    path = bench.result_path(logdir, models)
+def _record_timeout(bench: Benchmark, logdir: Path, timeout_s: int) -> None:
+    path = bench.result_path(logdir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"utility": False, "security": True,
                                 "error": f"killed after {timeout_s}s budget",
                                 "duration": float(timeout_s)}))
 
 
-def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max_workers,
+def run_benchmarks(benchmarks, logdir, benchmark_version, timeout_s, max_workers,
                    build: bool = True) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     exe = typeguard_exe(build) if any(b.system == "typeguard" for b in benchmarks) else None
 
     def run_task(bench: Benchmark) -> Outcome:
-        cmd = _worker_cmd(_spec(bench, models[bench.model], logdir, benchmark_version, exe))
+        cmd = _worker_cmd(bench, logdir, benchmark_version, exe)
         outcome = run_with_timeout(cmd, logdir / ".workers" / f"{bench.slug}.log", timeout_s)
         match outcome:
             case Outcome.TIMEOUT:
-                _record_timeout(bench, logdir, models, timeout_s)
+                _record_timeout(bench, logdir, timeout_s)
                 tqdm.write(f"TIMEOUT: {bench.slug}")
             case Outcome.COMPLETED:
                 pass
@@ -193,6 +175,13 @@ def run_benchmarks(benchmarks, models, logdir, benchmark_version, timeout_s, max
         if wave:
             tally.update(thread_map(run_task, wave, max_workers=max_workers))
     return RunReport(completed=tally[Outcome.COMPLETED], timeout=tally[Outcome.TIMEOUT])
+
+
+def run_worker_argv(argv: list[str]) -> None:
+    bench = Benchmark.from_json(argv[2])
+    logdir, benchmark_version = Path(argv[3]), argv[4]
+    exe = argv[5] if len(argv) > 5 else None
+    run_benchmark(bench, logdir, benchmark_version, exe)
 
 
 def main() -> int:
@@ -226,9 +215,9 @@ def main() -> int:
 
     if not args.process_only:
         benchmarks = expand(list(models.values()), suites, attacks, args.repeats, systems)
-        to_run, cached = split_cached(benchmarks, logdir, models)
+        to_run, cached = split_cached(benchmarks, logdir)
         max_workers = args.max_workers or min(max(math.ceil(len(to_run) / 4), 1), 512)
-        print_plan(to_run, cached, models, logdir, max_workers)
+        print_plan(to_run, cached, logdir, max_workers)
         if args.plan_only:
             return 0
         if to_run:
@@ -238,7 +227,7 @@ def main() -> int:
                     return 1
                 if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
                     return 1
-            report = run_benchmarks(to_run, models, logdir, args.benchmark_version,
+            report = run_benchmarks(to_run, logdir, args.benchmark_version,
                                     args.timeout, max_workers, build=not args.no_build)
             print(f"\nRun finished: {report.completed} completed, "
                   f"{report.timeout} timed out.")
@@ -251,6 +240,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     if len(sys.argv) > 2 and sys.argv[1] == "worker":
-        run_benchmark(json.loads(sys.argv[2]))
+        run_worker_argv(sys.argv)
     else:
         sys.exit(main())

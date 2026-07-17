@@ -34,7 +34,7 @@ def model(name="gpt-5.4-high") -> Model:
 def test_expand_slack_counts():
     atoms = expand([model()], ["slack"], ["direct", "important_instructions"], repeats=1)
     assert len(atoms) == 4 * (21 + 210)
-    assert len(set(atoms)) == len(atoms)
+    assert len({a.slug for a in atoms}) == len(atoms)
 
 
 def test_expand_nonslack_has_no_typeguard_policy():
@@ -53,13 +53,12 @@ def test_pipeline_names_match_camel_convention():
 
 def test_split_cached(tmp_path):
     m = model()
-    models = {m.name: m}
-    a1 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    a2 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_1")
-    p = a1.result_path(tmp_path, models)
+    a1 = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0")
+    a2 = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_1")
+    p = a1.result_path(tmp_path)
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps({"utility": True, "security": True}))
-    to_run, cached = split_cached([a1, a2], tmp_path, models)
+    to_run, cached = split_cached([a1, a2], tmp_path)
     assert cached == [a1] and to_run == [a2]
 
 
@@ -114,12 +113,12 @@ def slack_run(tmp_path, agent_exe, mock_llm):
     models = {m.name: m}
     mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE")
     benchmarks = [
-        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
-        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
+        Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0"),
+        Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0",
                   attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
-    report = run_benchmarks(benchmarks, models, logdir, "v1.2.2", timeout_s=300,
+    report = run_benchmarks(benchmarks, logdir, "v1.2.2", timeout_s=300,
                             max_workers=2, build=False)
     return models, logdir, report
 
@@ -177,12 +176,11 @@ fi""")
 
 def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     m = model()
-    models = {m.name: m}
     mock_llm("sleep 60")
-    bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    report = run_benchmarks([bench], models, tmp_path / "logs", "v1.2.2",
+    bench = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0")
+    report = run_benchmarks([bench], tmp_path / "logs", "v1.2.2",
                             timeout_s=5, max_workers=1, build=False)
-    result = json.loads(bench.result_path(tmp_path / "logs", models).read_text())
+    result = json.loads(bench.result_path(tmp_path / "logs").read_text())
     assert result["utility"] is False
     assert report.timeout == 1
 
@@ -197,11 +195,11 @@ def test_suite_table_full_matrix(tmp_path):
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
-            records.append((Benchmark(system, variant, m.name, 1, "slack", ut),
+            records.append((Benchmark(system, variant, m, 1, "slack", ut),
                             Result(utility=True, security=True)))
             for attack in attacks:
                 for it in injection_tasks:
-                    records.append((Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
+                    records.append((Benchmark(system, variant, m, 1, "slack", ut, attack, it),
                                     Result(utility=True, security=(variant == "nopolicy"))))
     tex = suite_table(records, "slack", models, attacks, repeats=1)
     # all four system rows including the no policy under attack cells
