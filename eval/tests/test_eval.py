@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,8 @@ import pytest
 EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
-from benchmark import Benchmark, Model, REPO_ROOT, Result, expand, split_cached  # noqa: E402
+from benchmark import (  # noqa: E402
+    AgentConfig, Benchmark, Model, REPO_ROOT, Result, expand, split_cached)
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
@@ -24,11 +26,18 @@ from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 def model(name="gpt-5.4-high") -> Model:
     return Model(
         name=name, display="GPT-5.4 (high)",
-        agent_config={"modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0,
-                      "systemPrompt": "", "maxAttempts": 3, "maxDepth": 10},
+        agent_config=AgentConfig(modelName="gpt-5.4", reasoningEffort="high", seed=0,
+                                 systemPrompt="", maxAttempts=3, maxDepth=10),
         camel_model="openai:gpt-5.4-2026-03-05", camel_reasoning=True,
         attack_model_name="ChatGPT",
     )
+
+
+def configs_for(m: Model, tmp_path: Path) -> dict[str, str]:
+    # Workers load their model from a config file, so write one.
+    path = tmp_path / f"{m.name}.json"
+    path.write_text(json.dumps(asdict(m)))
+    return {m.name: str(path)}
 
 
 def test_expand_slack_counts():
@@ -53,12 +62,13 @@ def test_pipeline_names_match_camel_convention():
 
 def test_split_cached(tmp_path):
     m = model()
-    a1 = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0")
-    a2 = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_1")
-    p = a1.result_path(tmp_path)
+    models = {m.name: m}
+    a1 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
+    a2 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_1")
+    p = a1.result_path(tmp_path, m)
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps({"utility": True, "security": True}))
-    to_run, cached = split_cached([a1, a2], tmp_path)
+    to_run, cached = split_cached([a1, a2], tmp_path, models)
     assert cached == [a1] and to_run == [a2]
 
 
@@ -113,13 +123,13 @@ def slack_run(tmp_path, agent_exe, mock_llm):
     models = {m.name: m}
     mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE")
     benchmarks = [
-        Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0"),
-        Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0",
+        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
+        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
                   attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
-    report = run_benchmarks(benchmarks, logdir, "v1.2.2", timeout_s=300,
-                            max_workers=2, build=False)
+    report = run_benchmarks(benchmarks, configs_for(m, tmp_path), logdir, "v1.2.2",
+                            timeout_s=300, max_workers=2, build=False)
     return models, logdir, report
 
 
@@ -177,10 +187,10 @@ fi""")
 def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     m = model()
     mock_llm("sleep 60")
-    bench = Benchmark("typeguard", "policy", m, 1, "slack", "user_task_0")
-    report = run_benchmarks([bench], tmp_path / "logs", "v1.2.2",
+    bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
+    report = run_benchmarks([bench], configs_for(m, tmp_path), tmp_path / "logs", "v1.2.2",
                             timeout_s=5, max_workers=1, build=False)
-    result = json.loads(bench.result_path(tmp_path / "logs").read_text())
+    result = json.loads(bench.result_path(tmp_path / "logs", m).read_text())
     assert result["utility"] is False
     assert report.timeout == 1
 
@@ -195,11 +205,11 @@ def test_suite_table_full_matrix(tmp_path):
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
-            records.append((Benchmark(system, variant, m, 1, "slack", ut),
+            records.append((Benchmark(system, variant, m.name, 1, "slack", ut),
                             Result(utility=True, security=True)))
             for attack in attacks:
                 for it in injection_tasks:
-                    records.append((Benchmark(system, variant, m, 1, "slack", ut, attack, it),
+                    records.append((Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
                                     Result(utility=True, security=(variant == "nopolicy"))))
     tex = suite_table(records, "slack", models, attacks, repeats=1)
     # all four system rows including the no policy under attack cells

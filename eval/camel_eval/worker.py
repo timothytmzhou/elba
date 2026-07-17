@@ -14,14 +14,14 @@ _upstream = camel.models._is_oai_reasoning_model
 camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
-def make_pipeline(bench, logdir):
+def make_pipeline(bench, model, logdir):
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
-        bench.model.camel_model,
+        model.camel_model,
         False,  # use_original
         replay,  # replay_with_policies
         bench.attack if bench.attack != "none" else "important_instructions",
-        bench.model.agent_config.get("reasoningEffort") or "medium",
+        model.agent_config.reasoningEffort or "medium",
         None,  # thinking_budget_tokens
         bench.suite,
         None,  # ad_defense
