@@ -29,15 +29,16 @@ TASK_TIMEOUT_S = 600
 TYPEGUARD_POLICY_SUITES = {"slack"}
 
 # Mirrors the Haskell Config record, written out as the binary's config.json.
-# A None seed skips the llm seed option, which some providers lack.
+# None fields skip the matching llm option, which some providers lack.
 @dataclass(frozen=True)
 class AgentConfig:
     modelName: str
-    systemPrompt: str
-    maxAttempts: int
-    maxDepth: int
+    systemPrompt: str = ""
+    maxAttempts: int = 3
+    maxDepth: int = 10
     seed: int | None = None
     reasoningEffort: str | None = None
+    llmCommand: str | None = None
 
 
 # A None camel_model means CaMeL cannot run this model, typeguard only.
@@ -47,7 +48,6 @@ class Model:
     agent_config: AgentConfig
     camel_model: str | None = None
     display: str = ""
-    camel_reasoning: bool = False
     attack_model_name: str = "AI assistant"
 
 
@@ -57,7 +57,6 @@ def load_model(path: str | Path) -> Model:
         name=raw["name"], camel_model=raw.get("camel_model"),
         agent_config=AgentConfig(**raw["agent_config"]),
         display=raw.get("display") or raw["name"],
-        camel_reasoning=raw.get("camel_reasoning", False),
         attack_model_name=raw.get("attack_model_name", "AI assistant"))
 
 

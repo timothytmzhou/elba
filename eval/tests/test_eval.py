@@ -1,11 +1,10 @@
 """Tests of the eval infrastructure with no LLM calls.
 
 The end-to-end tests run the real agent binary and interpreter, with a
-scripted stand in for the llm CLI placed first on PATH.
+scripted stand in for the llm CLI wired in through llmCommand.
 """
 
 import json
-import os
 import subprocess
 import sys
 from dataclasses import asdict
@@ -24,12 +23,12 @@ from run import run_benchmarks, typeguard_exe  # noqa: E402
 from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 
 
-def model(name="gpt-5.4-high") -> Model:
+def model(name="gpt-5.4-high", llm_command=None) -> Model:
     return Model(
         name=name, display="GPT-5.4 (high)",
         agent_config=AgentConfig(modelName="gpt-5.4", reasoningEffort="high", seed=0,
-                                 systemPrompt="", maxAttempts=3, maxDepth=10),
-        camel_model="openai:gpt-5.4-2026-03-05", camel_reasoning=True,
+                                 llmCommand=llm_command),
+        camel_model="openai:gpt-5.4-2026-03-05",
         attack_model_name="ChatGPT",
     )
 
@@ -105,23 +104,22 @@ def agent_exe():
 
 
 @pytest.fixture()
-def mock_llm(tmp_path, monkeypatch):
-    # Writes a scripted llm CLI and puts it first on PATH for the workers.
-    def script(body: str) -> None:
+def mock_llm(tmp_path):
+    # Writes a scripted llm CLI, wired in through the config's llmCommand.
+    def script(body: str) -> str:
         exe = tmp_path / "bin" / "llm"
         exe.parent.mkdir(exist_ok=True)
         exe.write_text(f"#!/bin/bash\ncat > /dev/null\n{body}\n")
         exe.chmod(0o755)
-        monkeypatch.setenv("PATH", f"{exe.parent}:{os.environ['PATH']}")
+        return str(exe)
     return script
 
 
 @pytest.fixture()
 def slack_run(tmp_path, agent_exe, mock_llm):
     # Run benign and attacked slack benchmarks through the real runner.
-    m = model()
+    m = model(llm_command=mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE"))
     models = {m.name: m}
-    mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE")
     benchmarks = [
         Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
         Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
@@ -166,7 +164,7 @@ def test_processing_outputs(slack_run):
 def test_subagent_recursion(tmp_path, agent_exe, mock_llm):
     # The parent emission delegates to a subagent whose own emission answers.
     count = tmp_path / "calls"
-    mock_llm(f"""N=$(cat {count} 2>/dev/null || echo 0)
+    llm = mock_llm(f"""N=$(cat {count} 2>/dev/null || echo 0)
 echo $((N+1)) > {count}
 if [ "$N" = 0 ]; then cat <<'CODE'
 subagent "Return exactly the string hello." "" :: DC String
@@ -175,18 +173,18 @@ else cat <<'CODE'
 return "hello"
 CODE
 fi""")
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps(asdict(model(llm_command=llm).agent_config)))
     proc = subprocess.run(
-        [agent_exe, "--suite", "slack", "--secure"],
+        [agent_exe, "--suite", "slack", "--secure", "--config", str(config)],
         input='{"prompt": "Delegate to a subagent."}\n',
-        capture_output=True, text=True, timeout=300, cwd=REPO_ROOT,
-        env=os.environ.copy())
+        capture_output=True, text=True, timeout=300, cwd=REPO_ROOT)
     assert json.loads(proc.stdout.splitlines()[0]) == {"done": "hello"}, proc.stdout
     assert count.read_text().strip() == "2"
 
 
 def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
-    m = model()
-    mock_llm("sleep 60")
+    m = model(llm_command=mock_llm("sleep 60"))
     bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
     report = run_benchmarks([bench], configs_for(m, tmp_path), tmp_path / "logs", "v1.2.2",
                             timeout_s=5, max_workers=1, build=False)

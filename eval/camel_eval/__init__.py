@@ -29,9 +29,10 @@ def ensure_checkout() -> Path:
     env_file = CHECKOUT / ".env"
     if not env_file.exists():
         env_file.write_text("")
-    if "OPENAI_API_KEY" not in env_file.read_text() and os.environ.get("OPENAI_API_KEY"):
-        with env_file.open("a") as f:
-            f.write(f'\nOPENAI_API_KEY="{os.environ["OPENAI_API_KEY"]}"\n')
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        if key not in env_file.read_text() and os.environ.get(key):
+            with env_file.open("a") as f:
+                f.write(f'\n{key}="{os.environ[key]}"\n')
     return CHECKOUT
 
 

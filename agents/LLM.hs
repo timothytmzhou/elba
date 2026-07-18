@@ -28,6 +28,9 @@ data Config = Config
   , maxDepth        :: Int
   -- ^ Recursion budget across the recursive `subagent` binding. Decremented
   --   on each recursive call; mkAgent refuses to call the LLM at depth <= 0.
+  , llmCommand      :: Maybe FilePath
+  -- ^ The llm CLI to invoke. Nothing means llm on PATH. Anything with the
+  --   same interface works, which is how tests substitute a scripted model.
   }
 
 -- The default system prompt body lives in SystemPrompt.md so it can be
@@ -53,6 +56,7 @@ defaultConfig = Config
   , logPath         = Nothing
   , maxAttempts     = 3
   , maxDepth        = 10
+  , llmCommand      = Nothing
   }
 
 toArgs :: Config -> [String]
@@ -71,9 +75,10 @@ toArgs Config {modelName, seed, reasoningEffort} = modelArgs ++ seedArgs ++ effo
 withSession :: Config -> IO (String -> IO String)
 withSession config = do
   let base = toArgs config ++ ["--no-stream"]
+      cli = maybe "llm" id (llmCommand config)
   first <- newIORef True
   pure $ \msg -> do
     isFirst <- readIORef first
     writeIORef first False
     let continueArgs = if isFirst then ["-s", systemPrompt config] else ["-c"]
-    readProcess "llm" (base ++ continueArgs) msg
+    readProcess cli (base ++ continueArgs) msg

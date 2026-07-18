@@ -84,17 +84,18 @@ Drop a JSON into `configs/`:
   "name": "gpt-5.4-high",
   "display": "GPT-5.4 (high)",
   "camel_model": "openai:gpt-5.4-2026-03-05",
-  "camel_reasoning": true,
-  "agent_config": { "modelName": "gpt-5.4", "reasoningEffort": "high",
-                    "seed": 0, "systemPrompt": "", "maxAttempts": 3, "maxDepth": 10 }
+  "attack_model_name": "ChatGPT",
+  "agent_config": { "modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0 }
 }
 ```
 
-Any model the `llm` CLI can reach works for TypeGuard. For Amazon Bedrock
-install a plugin (`llm install llm-bedrock` for Nova) and use its model id
-as `modelName`, with AWS credentials in the environment or `llm keys set
-bedrock`. Omit `camel_model` and `seed` for providers without them; a model
-without `camel_model` runs TypeGuard only (see `configs/nova-pro.json`).
+`agent_config` mirrors the Haskell `Config` record and everything but
+`modelName` has a default. Any model the `llm` CLI can reach works for
+TypeGuard. For Amazon Bedrock install a plugin (`llm-bedrock-anthropic`
+for Claude) and use its model id as `modelName`, with AWS credentials in
+the environment; omit options the provider lacks, such as `seed`
+(`configs/opus4.7-high.json` runs TypeGuard on Bedrock and CaMeL on the
+Anthropic API). A model without `camel_model` runs TypeGuard only.
 
 ## Prerequisites
 

@@ -2,14 +2,6 @@
   "name": "gpt-5.4-high",
   "display": "GPT-5.4 (high)",
   "camel_model": "openai:gpt-5.4-2026-03-05",
-  "camel_reasoning": true,
   "attack_model_name": "ChatGPT",
-  "agent_config": {
-    "modelName": "gpt-5.4",
-    "reasoningEffort": "high",
-    "seed": 0,
-    "systemPrompt": "",
-    "maxAttempts": 3,
-    "maxDepth": 10
-  }
+  "agent_config": { "modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0 }
 }
