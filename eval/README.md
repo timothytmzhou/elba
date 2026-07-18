@@ -9,7 +9,7 @@ Prints the run plan, confirms (`--yes` to skip), runs everything in parallel, re
 ## Outputs (`<logdir>/results/`)
 - `dump.jsonl` — raw per-task records (verdicts, duration, tokens, transcript paths)
 - `table_<suite>.tex` — paste-ready paper table per suite
-- `confidence_intervals.tex` — TypeGuard − CaMeL paired-bootstrap 95% CIs
+- `confidence_intervals.tex` — TypeGuard − CaMeL paired-difference 95% CIs (Newcombe)
 
 ## Structure
 ```
@@ -18,7 +18,7 @@ config.py      model config types and loader
 benchmark.py   run matrix, result paths, the plan
 result.py      per-task result type and loader
 bridge.py      JSON protocol with the Haskell agent binary
-process.py     dump.jsonl, bootstrap CIs, LaTeX tables
+process.py     dump.jsonl, Newcombe CIs, LaTeX tables
 configs/       one JSON per model
 camel_eval/    self-contained CaMeL baseline
 tests/         pytest suite, no LLM calls

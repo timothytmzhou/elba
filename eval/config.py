@@ -43,3 +43,8 @@ def attack_persona(m: Model) -> str:
     if "gpt" in name or "openai" in name:
         return "ChatGPT"
     return "AI assistant"
+
+
+# A rough table label, the first two dash parts of the name capitalized.
+def display(m: Model) -> str:
+    return " ".join(part.capitalize() for part in m.name.split("-")[:2])

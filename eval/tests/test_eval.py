@@ -21,7 +21,7 @@ from config import AgentConfig, Model  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
-from process import paired_diff_ci, process, suite_table  # noqa: E402
+from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 
 
 def model(name="gpt-5.4-high", llm_command=None) -> Model:
@@ -71,12 +71,11 @@ def test_split_cached(tmp_path):
     assert cached == [a1] and to_run == [a2]
 
 
-def test_paired_diff_ci():
-    # equal marginals but discordant pairs, the interval straddles zero
-    diff, lo, hi = paired_diff_ci([(True, False)] * 3 + [(False, True)] * 3 + [(True, True)] * 4)
-    assert abs(diff) < 1e-9 and lo < 0 < hi
-    # typeguard strictly better, a positive difference below the upper bound
-    diff, lo, hi = paired_diff_ci([(True, False)] * 5 + [(True, True)] * 10)
+def test_newcombe_paired():
+    pairs = [(True, True)] * 10 + [(False, False)] * 5
+    diff, lo, hi = newcombe_paired_diff(pairs)
+    assert diff == 0 and lo < 0 < hi
+    diff, lo, hi = newcombe_paired_diff([(True, False)] * 5 + [(True, True)] * 10)
     assert diff > 0 and hi > diff
 
 
