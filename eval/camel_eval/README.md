@@ -6,3 +6,5 @@ at `<repo>/camel` inside its own `uv` venv, with zero source changes.
 `camel-nopolicy` is upstream's fresh pass and `camel-policy` is upstream's
 `PrivilegedLLMReplayer` replaying that recording under the suite's policy
 engine at no LLM cost, with each result copied to our uniform result path.
+For a `bedrock:` camel model the worker swaps the SDK's Bedrock client
+under upstream's unchanged anthropic logic.

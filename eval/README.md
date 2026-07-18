@@ -92,10 +92,12 @@ Drop a JSON into `configs/`:
 `agent_config` mirrors the Haskell `Config` record and everything but
 `modelName` has a default. Any model the `llm` CLI can reach works for
 TypeGuard. For Amazon Bedrock install a plugin (`llm-bedrock-anthropic`
-for Claude) and use its model id as `modelName`, with AWS credentials in
-the environment; omit options the provider lacks, such as `seed`
-(`configs/opus4.7-high.json` runs TypeGuard on Bedrock and CaMeL on the
-Anthropic API). A model without `camel_model` runs TypeGuard only.
+for Claude) and use its model id as `modelName`; omit options the provider
+lacks, such as `seed`. A `bedrock:` prefixed `camel_model` runs CaMeL
+through Bedrock too. Everything Bedrock authenticates through the standard
+AWS chain, so an EC2 instance role with Bedrock access is enough, plus
+`AWS_REGION` set to a region where the model is enabled. A model without
+`camel_model` runs TypeGuard only.
 
 ## Prerequisites
 
