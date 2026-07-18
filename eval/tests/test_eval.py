@@ -34,7 +34,7 @@ def model(name="gpt-5.4-high", llm_command=None) -> Model:
 
 
 def configs_for(m: Model, tmp_path: Path) -> dict[str, str]:
-    # Workers load their model from a config file, so write one.
+    # Workers load their model from a config file so write one.
     path = tmp_path / f"{m.name}.json"
     path.write_text(json.dumps({**asdict(m.agent_config), "camel_model": m.camel_model}))
     return {m.name: str(path)}
@@ -105,7 +105,7 @@ def agent_exe():
 
 @pytest.fixture()
 def mock_llm(tmp_path):
-    # Writes a scripted llm CLI, wired in through the config's llmCommand.
+    # Writes a scripted llm CLI wired in through the config llmCommand.
     def script(body: str) -> str:
         exe = tmp_path / "bin" / "llm"
         exe.parent.mkdir(exist_ok=True)

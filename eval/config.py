@@ -7,8 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-# Mirrors the Haskell Config record, written out as the binary's config.json.
-# None fields skip the matching llm option, which some providers lack.
+# Mirrors the Haskell Config record written out as the binary config json.
 @dataclass(frozen=True)
 class AgentConfig:
     modelName: str
@@ -20,7 +19,7 @@ class AgentConfig:
     llmCommand: str | None = None
 
 
-# A None camel_model means CaMeL cannot run this model, typeguard only.
+# A None camel_model means only typeguard can run this model.
 @dataclass(frozen=True)
 class Model:
     name: str
@@ -28,14 +27,13 @@ class Model:
     camel_model: str | None = None
 
 
-# A config file is one AgentConfig plus camel_model, named by the model.
 def load_model(path: str | Path) -> Model:
     raw = json.loads(Path(path).read_text())
     camel_model = raw.pop("camel_model", None)
     return Model(name=Path(path).stem, agent_config=AgentConfig(**raw), camel_model=camel_model)
 
 
-# The persona the injection attack impersonates, the same across both systems.
+# The persona the injection attack impersonates.
 def attack_persona(m: Model) -> str:
     name = m.agent_config.modelName.lower()
     if "claude" in name or "anthropic" in name:
@@ -45,6 +43,5 @@ def attack_persona(m: Model) -> str:
     return "AI assistant"
 
 
-# A rough table label, the first two dash parts of the name capitalized.
 def display(m: Model) -> str:
     return " ".join(part.capitalize() for part in m.name.split("-")[:2])

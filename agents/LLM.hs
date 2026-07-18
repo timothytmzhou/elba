@@ -16,7 +16,7 @@ import System.Process (readProcess)
 data Config = Config
   { modelName       :: Maybe String
   , seed            :: Maybe Integer
-  -- ^ Nothing skips the flag, for providers without a seed option.
+  -- ^ Nothing skips the flag for providers without a seed option.
   , reasoningEffort :: Maybe String
   -- ^ For reasoning models (e.g. gpt-5.x): "low" | "medium" | "high".
   --   Nothing skips the flag and uses the provider default.
@@ -29,8 +29,7 @@ data Config = Config
   -- ^ Recursion budget across the recursive `subagent` binding. Decremented
   --   on each recursive call; mkAgent refuses to call the LLM at depth <= 0.
   , llmCommand      :: Maybe FilePath
-  -- ^ The llm CLI to invoke. Nothing means llm on PATH. Anything with the
-  --   same interface works, which is how tests substitute a scripted model.
+  -- ^ The llm CLI to invoke where Nothing means llm on PATH and tests use this to substitute a scripted model.
   }
 
 -- The default system prompt body lives in SystemPrompt.md so it can be

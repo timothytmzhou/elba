@@ -38,8 +38,7 @@ class HaskellAgentPipeline:
         self.llm_user_dir = llm_user_dir
 
     def _child_env(self) -> dict:
-        # a private LLM_USER_PATH per agent keeps parallel llm CLI
-        # conversations and token counts isolated
+        # A private LLM_USER_PATH per agent keeps parallel llm conversations and token counts isolated.
         self.llm_user_dir.mkdir(parents=True, exist_ok=True)
         default = Path(os.environ.get("LLM_USER_PATH",
                                       Path.home() / ".config" / "io.datasette.llm"))

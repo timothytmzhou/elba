@@ -26,7 +26,7 @@ ATTACKS = ("direct", "important_instructions")
 BENCHMARK_VERSION = "v1.2.2"
 TASK_TIMEOUT_S = 600
 
-# Suites whose typeguard IFC policy is written. The rest run no policy only.
+# Suites that have a written typeguard IFC policy.
 TYPEGUARD_POLICY_SUITES = {"slack"}
 
 
@@ -46,7 +46,6 @@ def is_benign(b: Benchmark) -> bool:
     return b.attack == BENIGN
 
 
-# Our result directory, one segment, the same shape for every system.
 def pipeline_name(b: Benchmark) -> str:
     return f"{b.system}-{b.variant}-{b.model}"
 

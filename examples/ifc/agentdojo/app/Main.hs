@@ -28,7 +28,7 @@ suites =
   [ ("slack", (["SlackTCB", "WebTCB"], ["Slack", "Web", "IFC"]))
   ]
 
--- Information flow guidance appended to the secure agents' system prompt.
+-- Information flow guidance appended to the secure agent system prompt.
 ifcGuidance :: String
 ifcGuidance =
   $( do
@@ -60,8 +60,7 @@ main = do
         defEnv
           { modules = if secure then secureMods else insecureMods
           , extensions = [OverloadedStrings]
-          , -- The alias keeps the required type spelled DC where TypeRep
-            -- rendering would expand the synonym.
+          , -- The alias keeps the required type spelled DC where TypeRep would expand the synonym.
             typeAliases = [("LIO DCLabel", "DC") | secure]
           }
   loaded <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)

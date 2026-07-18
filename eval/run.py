@@ -154,7 +154,7 @@ def _record_timeout(bench: Benchmark, logdir: Path, timeout_s: int) -> None:
                                 "duration": float(timeout_s)}))
 
 
-# configs maps a model name to its config file, which each worker loads itself.
+# configs maps a model name to the config file each worker loads itself.
 def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir: Path,
                    benchmark_version: str, timeout_s: int, max_workers: int,
                    build: bool = True) -> RunReport:
@@ -174,8 +174,7 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
                 pass
         return outcome
 
-    # camel+secpol replays the recordings +camel writes, so it runs as a second
-    # wave once the whole first wave has finished
+    # The camel policy replay runs as a second wave after the record wave writes its logs.
     record = [b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")]
     replay = [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]
     tally = Counter()

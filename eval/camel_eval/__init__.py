@@ -37,7 +37,7 @@ def ensure_checkout() -> Path:
 
 
 def worker_cmd(worker_args: list[str]) -> list[str]:
-    # worker_args is [worker, benchmark_json, logdir, benchmark_version]
+    # worker_args holds the worker tag benchmark json logdir and benchmark version.
     uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
     return [uv, "run", "--project", str(CHECKOUT), "--env-file", str(CHECKOUT / ".env"),
             "python", str(HERE.parent / "run.py"), *worker_args]

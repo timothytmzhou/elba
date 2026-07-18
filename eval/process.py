@@ -35,7 +35,7 @@ def _wilson(successes: int, trials: int) -> tuple[float, float]:
     return ci.low, ci.high
 
 
-# 95 percent CI for a paired proportion difference, Newcombe 1998 method 10.
+# 95 percent CI for a paired proportion difference using Newcombe 1998 method 10.
 def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
     n = len(pairs)
     a = sum(1 for x, y in pairs if x and y)

@@ -1,5 +1,4 @@
-# Runs one benchmark on CaMeL, inside the checkout venv. camel-nopolicy is
-# upstream's fresh pass. camel-policy replays that recording under the policies.
+# Runs one benchmark on CaMeL inside the checkout venv where nopolicy is a fresh pass and policy replays it.
 import os
 import tempfile
 from pathlib import Path
@@ -13,9 +12,7 @@ camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
 def _use_bedrock(bedrock_model: str) -> None:
-    # Upstream's anthropic branch keeps all its logic. Underneath it the SDK's
-    # Bedrock client is swapped in, along with the full model id that
-    # upstream's split would truncate at the second colon.
+    # Swaps in the Bedrock client under the upstream anthropic path and keeps the full model id upstream would truncate.
     os.environ.setdefault("ANTHROPIC_API_KEY", "unused-on-bedrock")
     base = camel.models.agent_pipeline.AnthropicLLM
 
@@ -46,13 +43,13 @@ def run_camel(bench, model, logdir, benchmark_version):
         None,  # q_llm
     )
     if replay:
-        # the replayer reads recordings from logs/ relative to cwd
+        # the replayer reads recordings from a logs dir relative to cwd.
         tmp = tempfile.mkdtemp()
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
     run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
 
-    # camel writes under its own upstream pipeline name, copy it to ours
+    # camel writes under its own upstream pipeline name so copy it to ours.
     src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id
            / bench.attack / f"{bench.injection_task_id}.json")
     dst = result_path(bench, logdir)
