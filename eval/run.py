@@ -29,10 +29,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import camel_eval  # noqa: E402
 from benchmark import (  # noqa: E402
-    ATTACKS, BENCHMARK_VERSION, Benchmark, Model, Outcome, REPO_ROOT, RunReport,
-    SUITES, TASK_TIMEOUT_S, expand, is_benign, load_model, pipeline_name,
-    print_plan, result_path, slug, split_cached,
+    ATTACKS, BENCHMARK_VERSION, Benchmark, REPO_ROOT, SUITES, TASK_TIMEOUT_S,
+    expand, is_benign, pipeline_name, print_plan, result_path, slug, split_cached,
 )
+from config import Model, attack_persona, load_model  # noqa: E402
+from result import Outcome, RunReport  # noqa: E402
 
 
 def kill_group(proc: subprocess.Popen) -> None:
@@ -78,8 +79,9 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
     TaskResults.model_rebuild()
     rep_dir = logdir / f"rep{bench.rep}"
     # important_instructions embeds a model name matched against MODEL_NAMES
-    MODEL_NAMES.setdefault(pipeline.name, model.attack_model_name)
-    MODEL_NAMES.setdefault(pipeline.name.removesuffix("+secpol"), model.attack_model_name)
+    persona = attack_persona(model)
+    MODEL_NAMES.setdefault(pipeline.name, persona)
+    MODEL_NAMES.setdefault(pipeline.name.removesuffix("+secpol"), persona)
 
     suite = get_suite(benchmark_version, bench.suite)
     with OutputLogger(str(rep_dir)):

@@ -3,19 +3,25 @@
 module IFC
   ( DC,
     DCLabeled,
+    runDC,
     toLabeled,
     unlabel,
   )
 where
 
-import LIO (getClearance, glb, setClearance, taint)
-import LIO.DCLabel (DC, DCLabeled, cTrue, dcIntegrity, (%%))
+import LIO (evalLIO, getClearance, glb, setClearance, taint)
+import LIO.DCLabel (DC, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
 import LIO.TCB
-  ( LIOState (lioClearance, lioLabel),
+  ( LIOState (..),
     Labeled (LabeledTCB),
     getLIOStateTCB,
     putLIOStateTCB,
   )
+
+-- | Runs a DC computation from a public trusted starting label.
+runDC :: DC a -> IO a
+runDC m =
+  evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
 -- | Runs a computation without tainting the current label.
 toLabeled :: DC a -> DC (DCLabeled a)

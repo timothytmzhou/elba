@@ -1,14 +1,6 @@
-"""Driver for the slack reference programs.
+"""Runs the insecure and secure slack reference programs against agentdojo's slack suite over the JSONL bridge.
 
-One hand-coded program per user_task, insecure (`ref-*`, plain IO) and
-secure (`secref-*`, in DC against the labeled surface), run through the
-JSONL bridge protocol against agentdojo's slack environment. Pass/fail is
-decided by calling agentdojo's per-task `utility(...)` /
-`utility_from_traces(...)` against the env state mutated by the bridge
-round-trip; a secure task ending in "blocked by IFC" counts as expected.
-
-Environments come from agentdojo (`get_suite(...).load_and_inject_default_environment({})`);
-they are never hand-written here.
+A run passes when agentdojo's utility check succeeds or a secure run ends blocked by IFC.
 
 Usage:
     python run_tests.py                            # run all tests

@@ -13,11 +13,10 @@ import Data.Aeson.TH (defaultOptions, deriveFromJSON)
 import Data.ByteString.Lazy qualified as BL
 import Data.Maybe (fromMaybe)
 import Env (Env (..), Extension (OverloadedStrings), defEnv)
-import IFC (DC)
+import IFC (DC, runDC)
 import LLM (Config (..), defaultConfig, defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax qualified as TH
-import Policy (runDC)
 import System.Environment (getArgs)
 import System.FilePath (takeDirectory, (</>))
 

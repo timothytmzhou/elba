@@ -16,27 +16,27 @@ EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
 from benchmark import (  # noqa: E402
-    AgentConfig, Benchmark, Model, REPO_ROOT, Result, expand, pipeline_name, result_path,
-    slug, split_cached)
+    Benchmark, REPO_ROOT, expand, pipeline_name, result_path, slug, split_cached)
+from config import AgentConfig, Model  # noqa: E402
+from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
-from process import newcombe_paired_diff, process, suite_table  # noqa: E402
+from process import paired_diff_ci, process, suite_table  # noqa: E402
 
 
 def model(name="gpt-5.4-high", llm_command=None) -> Model:
     return Model(
-        name=name, display="GPT-5.4 (high)",
+        name=name,
         agent_config=AgentConfig(modelName="gpt-5.4", reasoningEffort="high", seed=0,
                                  llmCommand=llm_command),
         camel_model="openai:gpt-5.4-2026-03-05",
-        attack_model_name="ChatGPT",
     )
 
 
 def configs_for(m: Model, tmp_path: Path) -> dict[str, str]:
     # Workers load their model from a config file, so write one.
     path = tmp_path / f"{m.name}.json"
-    path.write_text(json.dumps(asdict(m)))
+    path.write_text(json.dumps({**asdict(m.agent_config), "camel_model": m.camel_model}))
     return {m.name: str(path)}
 
 
@@ -71,11 +71,12 @@ def test_split_cached(tmp_path):
     assert cached == [a1] and to_run == [a2]
 
 
-def test_newcombe_paired():
-    pairs = [(True, True)] * 10 + [(False, False)] * 5
-    diff, lo, hi = newcombe_paired_diff(pairs)
-    assert diff == 0 and lo < 0 < hi
-    diff, lo, hi = newcombe_paired_diff([(True, False)] * 5 + [(True, True)] * 10)
+def test_paired_diff_ci():
+    # equal marginals but discordant pairs, the interval straddles zero
+    diff, lo, hi = paired_diff_ci([(True, False)] * 3 + [(False, True)] * 3 + [(True, True)] * 4)
+    assert abs(diff) < 1e-9 and lo < 0 < hi
+    # typeguard strictly better, a positive difference below the upper bound
+    diff, lo, hi = paired_diff_ci([(True, False)] * 5 + [(True, True)] * 10)
     assert diff > 0 and hi > diff
 
 

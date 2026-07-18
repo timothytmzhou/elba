@@ -10,13 +10,15 @@ Reads only what the runner wrote. Writes under <logdir>/results/.
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import asdict
 from pathlib import Path
 
-from scipy.stats import binomtest
+import numpy as np
+from scipy.stats import bootstrap
 
-from benchmark import BENIGN, Benchmark, Model, Result, load_result, pipeline_name, suite_tasks
+from benchmark import BENIGN, Benchmark, pipeline_name, suite_tasks
+from config import Model
+from result import Result, load_result
 
 SYSTEM_LABELS = {
     ("typeguard", "policy"): "TypeGuard",
@@ -28,32 +30,14 @@ ROW_ORDER = list(SYSTEM_LABELS)
 ATTACK_LABELS = {"direct": "Direct", "important_instructions": r"Imp.\ Instr."}
 
 
-def _wilson(successes: int, trials: int):
-    ci = binomtest(successes, trials).proportion_ci(method="wilson")
-    return ci.low, ci.high
-
-
-# 95 percent CI for a paired proportion difference, Newcombe 1998 method 10.
-def newcombe_paired_diff(pairs: list[tuple[bool, bool]]):
-    n = len(pairs)
-    a = sum(1 for x, y in pairs if x and y)
-    b = sum(1 for x, y in pairs if x and not y)
-    c = sum(1 for x, y in pairs if not x and y)
-    d = n - a - b - c
-    p1, p2 = (a + b) / n, (a + c) / n
-    diff = p1 - p2
-    l1, u1 = _wilson(a + b, n)
-    l2, u2 = _wilson(a + c, n)
-    prod = (a + b) * (c + d) * (a + c) * (b + d)
-    if prod == 0:
-        phi = 0.0
-    else:
-        cross = a * d - b * c
-        cross = max(cross - n / 2, 0) if cross > 0 else cross
-        phi = cross / math.sqrt(prod)
-    lo = diff - math.sqrt(max((p1 - l1) ** 2 - 2 * phi * (p1 - l1) * (u2 - p2) + (u2 - p2) ** 2, 0))
-    hi = diff + math.sqrt(max((u1 - p1) ** 2 - 2 * phi * (u1 - p1) * (p2 - l2) + (p2 - l2) ** 2, 0))
-    return 100 * diff, 100 * lo, 100 * hi
+# 95 percent CI in points for a paired proportion difference, by scipy bootstrap.
+def paired_diff_ci(pairs: list[tuple[bool, bool]]):
+    tg = np.array([t for t, _ in pairs], dtype=float)
+    cm = np.array([c for _, c in pairs], dtype=float)
+    ci = bootstrap((tg, cm), lambda a, b, axis=-1: a.mean(axis) - b.mean(axis),
+                   paired=True, vectorized=True, n_resamples=9999,
+                   random_state=0, method="percentile").confidence_interval
+    return 100 * (tg.mean() - cm.mean()), 100 * ci.low, 100 * ci.high
 
 
 def load_results(logdir: Path, models: dict[str, Model]) -> list[tuple[Benchmark, Result]]:
@@ -132,7 +116,7 @@ def suite_table(records, suite, models, attacks, repeats) -> str:
         "System & Model & " + " & ".join(sub) + r" \\", r"\midrule",
     ]
     for system, variant in ROW_ORDER:
-        group = [(m.display, row_cells(records, system, variant, m, suite, attacks))
+        group = [(m.name, row_cells(records, system, variant, m, suite, attacks))
                  for m in models.values()]
         group = [(d, c) for d, c in group if c]
         if not group:
@@ -157,7 +141,7 @@ def ci_table(records, suites, models, attacks) -> str:
     lines = [
         r"\begin{table}", r"\centering\small",
         r"\caption{95\% confidence intervals for the difference in task completion rates "
-        r"(TypeGuard $-$ CaMeL), using Newcombe's score interval for paired proportions.}",
+        r"(TypeGuard $-$ CaMeL), by paired bootstrap over shared tasks.}",
         r"\label{tab:agentdojo-cis}", r"\begin{tabular}{lllr}", r"\toprule",
         r"Suite & Model & Setting & 95\% CI (pp) \\", r"\midrule",
     ]
@@ -173,8 +157,8 @@ def ci_table(records, suites, models, attacks) -> str:
                 common = sorted(set(tg) & set(cm))
                 if not common:
                     continue
-                _, lo, hi = newcombe_paired_diff([(tg[u], cm[u]) for u in common])
-                lines.append(rf"{suite} & {model.display} & {setting} & $[{lo:+.1f}, {hi:+.1f}]$ \\")
+                _, lo, hi = paired_diff_ci([(tg[u], cm[u]) for u in common])
+                lines.append(rf"{suite} & {model.name} & {setting} & $[{lo:+.1f}, {hi:+.1f}]$ \\")
                 rows += 1
     lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     return ("\n".join(lines) + "\n") if rows else "% no paired data yet\n"
@@ -195,7 +179,7 @@ def process(logdir, models, suites, attacks, repeats) -> Path:
                     cells = row_cells(records, system, variant, model, suite, attacks)
                     if cells:
                         row = (c.replace(r"\%", "%") for c in cells)
-                        print(f"  {SYSTEM_LABELS[system, variant] + '/' + model.display:<36}"
+                        print(f"  {SYSTEM_LABELS[system, variant] + '/' + model.name:<36}"
                               + "".join(f"{c:<26}" for c in row))
     (outdir / "confidence_intervals.tex").write_text(ci_table(records, suites, models, attacks))
     print(f"\nProcessed {len(records)} task evaluations into {outdir}")

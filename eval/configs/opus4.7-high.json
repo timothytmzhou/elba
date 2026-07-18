@@ -1,7 +1,0 @@
-{
-  "name": "opus-4.7-high",
-  "display": "Opus 4.7 (high)",
-  "camel_model": "bedrock:us.anthropic.claude-opus-4-7-20260416-v1:0",
-  "attack_model_name": "Claude",
-  "agent_config": { "modelName": "us.anthropic.claude-opus-4-7-20260416-v1:0" }
-}

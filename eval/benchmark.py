@@ -10,11 +10,12 @@ which also serves as the resume cache.
 
 from __future__ import annotations
 
-import json
 from collections import Counter
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from pathlib import Path
+
+from config import Model
+from result import load_result
 
 EVAL_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EVAL_DIR.parent
@@ -27,37 +28,6 @@ TASK_TIMEOUT_S = 600
 
 # Suites whose typeguard IFC policy is written. The rest run no policy only.
 TYPEGUARD_POLICY_SUITES = {"slack"}
-
-# Mirrors the Haskell Config record, written out as the binary's config.json.
-# None fields skip the matching llm option, which some providers lack.
-@dataclass(frozen=True)
-class AgentConfig:
-    modelName: str
-    systemPrompt: str = ""
-    maxAttempts: int = 3
-    maxDepth: int = 10
-    seed: int | None = None
-    reasoningEffort: str | None = None
-    llmCommand: str | None = None
-
-
-# A None camel_model means CaMeL cannot run this model, typeguard only.
-@dataclass(frozen=True)
-class Model:
-    name: str
-    agent_config: AgentConfig
-    camel_model: str | None = None
-    display: str = ""
-    attack_model_name: str = "AI assistant"
-
-
-def load_model(path: str | Path) -> Model:
-    raw = json.loads(Path(path).read_text())
-    return Model(
-        name=raw["name"], camel_model=raw.get("camel_model"),
-        agent_config=AgentConfig(**raw["agent_config"]),
-        display=raw.get("display") or raw["name"],
-        attack_model_name=raw.get("attack_model_name", "AI assistant"))
 
 
 @dataclass(frozen=True)
@@ -117,47 +87,6 @@ def expand(models: list[Model], suites: list[str], attacks: list[str], repeats: 
                         benchmarks += [Benchmark(task_id=ut, attack=a, injection_task_id=it, **base)
                                        for a in attacks for ut in user_tasks for it in injection_tasks]
     return benchmarks
-
-
-# Utility False with an error covers denials and timeouts.
-@dataclass(frozen=True)
-class Result:
-    utility: bool
-    security: bool
-    duration_s: float | None = None
-    tokens: dict | None = None
-    error: str | None = None
-    final_output: str | None = None
-    messages: list = field(default_factory=list)
-    agent_transcript: str | None = None
-    result_file: str = ""
-
-
-def load_result(path: Path) -> Result | None:
-    try:
-        r = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
-    if r.get("utility") not in (True, False):
-        return None
-    final = next((blk.get("content") or blk.get("text", "")
-                  for m in reversed(r.get("messages") or [])
-                  if m.get("role") == "assistant"
-                  for blk in (m.get("content") or []) if isinstance(blk, dict)), None)
-    return Result(r["utility"], r["security"], r.get("duration"), r.get("tokens"),
-                  r.get("error"), final, r.get("messages") or [],
-                  r.get("agent_transcript"), str(path))
-
-
-class Outcome(Enum):
-    COMPLETED = "completed"
-    TIMEOUT = "timeout"
-
-
-@dataclass(frozen=True)
-class RunReport:
-    completed: int = 0
-    timeout: int = 0
 
 
 def split_cached(benchmarks: list[Benchmark],

@@ -2,7 +2,6 @@
 
 module Policy
   ( DCLabeled
-  , runDC
   , unlabelTCB
   , assertWrite
   , assertIntegrity
@@ -14,16 +13,11 @@ module Policy
   ) where
 
 import Control.Monad (unless)
-import LIO (evalLIO, getLabel, speaksFor)
+import LIO (getLabel, speaksFor)
 import LIO.DCLabel (CNF, DC, DCLabel, DCLabeled, cFalse, cTrue, dcIntegrity, toCNF, (%%))
 import LIO.Error (labelError)
 import LIO.Labeled (unlabelP)
-import LIO.TCB (LIOState (..), Priv (PrivTCB), ioTCB)
-
--- | Runs a DC computation from a public trusted starting label.
-runDC :: DC a -> IO a
-runDC m =
-  evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
+import LIO.TCB (Priv (PrivTCB), ioTCB)
 
 -- | Secrecy anyone may read.
 public :: CNF

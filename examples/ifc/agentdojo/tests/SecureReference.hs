@@ -1,6 +1,5 @@
 module Main where
 
-import Policy (runDC)
 import Bridge (readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (when, zipWithM_)
@@ -17,7 +16,7 @@ import Data.List
     (\\),
   )
 import Data.Ord (Down (..), comparing)
-import IFC (DC, toLabeled, unlabel)
+import IFC (DC, runDC, toLabeled, unlabel)
 import Slack
 import System.Environment (getArgs)
 import Web
