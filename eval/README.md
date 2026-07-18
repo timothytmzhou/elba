@@ -7,12 +7,10 @@ IFC policies, benign and under attack — and produces the paper outputs:
 python eval/run.py --models eval/configs/*.json
 ```
 
-It first prints the plan (how many task evaluations will run, and a cost
-estimate priced from [LiteLLM's price table](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json),
-fetched once into a gitignored `pricing.json`), asks for confirmation
-(`--yes` to skip), runs every
-remaining evaluation in parallel, then processes the results. Finished
-evaluations are cached by result file, so rerunning resumes.
+It first prints the plan (how many task evaluations will run), asks for
+confirmation (`--yes` to skip), runs every remaining evaluation in
+parallel, then processes the results. Finished evaluations are cached by
+result file, so rerunning resumes.
 
 To reproduce the paper's slack-only tables:
 
@@ -91,9 +89,6 @@ Drop a JSON into `configs/`:
                     "seed": 0, "systemPrompt": "", "maxAttempts": 3, "maxDepth": 10 }
 }
 ```
-
-(the plan refuses to guess prices for unknown models, delete
-`eval/pricing.json` to refetch).
 
 Any model the `llm` CLI can reach works for TypeGuard. For Amazon Bedrock
 install a plugin (`llm install llm-bedrock` for Nova) and use its model id

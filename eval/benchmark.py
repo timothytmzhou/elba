@@ -28,12 +28,6 @@ TASK_TIMEOUT_S = 600
 # Suites whose typeguard IFC policy is written. The rest run no policy only.
 TYPEGUARD_POLICY_SUITES = {"slack"}
 
-# Fallback token counts per task for the estimate before any run has data.
-DEFAULT_TOKENS_PER_TASK = {"input": 30_000, "output": 5_000}
-# CaMeL spends extra on its quarantined LLM round trips.
-CAMEL_TOKEN_MULTIPLIER = 1.5
-
-
 # Mirrors the Haskell Config record, written out as the binary's config.json.
 # A None seed skips the llm seed option, which some providers lack.
 @dataclass(frozen=True)
@@ -175,79 +169,7 @@ def split_cached(benchmarks: list[Benchmark],
     return to_run, cached
 
 
-PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-PRICING_CACHE = EVAL_DIR / "pricing.json"
-
-
-def load_pricing() -> dict:
-    """OpenAI prices per million tokens, fetched once and cached gitignored."""
-    if PRICING_CACHE.exists():
-        return json.loads(PRICING_CACHE.read_text())
-    import time
-    import urllib.request
-
-    raw = json.load(urllib.request.urlopen(PRICING_URL, timeout=30))
-    models = {name: {"input": m["input_cost_per_token"] * 1e6,
-                     "output": m["output_cost_per_token"] * 1e6}
-              for name, m in raw.items()
-              if m.get("litellm_provider") in ("openai", "bedrock", "bedrock_converse")
-              and "input_cost_per_token" in m and "output_cost_per_token" in m}
-    pricing = {"source": PRICING_URL, "retrieved": time.strftime("%Y-%m-%d"), "models": models}
-    PRICING_CACHE.write_text(json.dumps(pricing, indent=1))
-    return pricing
-
-
-# The model id the price table is keyed by, from camel or the llm CLI name.
-def price_id(m: Model) -> str:
-    return m.camel_model.split(":", 1)[1] if m.camel_model else m.agent_config.modelName
-
-
-def price_for(model_id: str, pricing: dict) -> dict:
-    # Dated snapshots like gpt-5.4-2026-03-05 fall back to the gpt-5.4 row.
-    table = pricing["models"]
-    if model_id in table:
-        return table[model_id]
-    matches = [k for k in table if model_id.startswith(k)]
-    if not matches:
-        raise KeyError(f"no price for {model_id!r}. delete eval/pricing.json to refetch")
-    return table[max(matches, key=len)]
-
-
-def measured_tokens_per_task(logdir: Path) -> dict | None:
-    total, n = {"input": 0, "output": 0}, 0
-    for path in logdir.glob("rep*/typeguard*/**/*.json"):
-        try:
-            tokens = json.loads(path.read_text()).get("tokens")
-        except (OSError, json.JSONDecodeError):
-            continue
-        if tokens and tokens.get("input"):
-            total["input"] += tokens["input"]
-            total["output"] += tokens["output"]
-            n += 1
-    if n < 5:
-        return None
-    return {"input": total["input"] // n, "output": total["output"] // n, "samples": n}
-
-
-def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
-    pricing = load_pricing()
-    measured = measured_tokens_per_task(logdir)
-    per_task = measured or DEFAULT_TOKENS_PER_TASK
-    basis = (f"measured over {measured['samples']} tasks" if measured
-             else f"assuming {per_task['input'] // 1000}k in and {per_task['output'] // 1000}k out per task")
-    cost = 0.0
-    for b in benchmarks:
-        # camel policy replays the recorded run and costs no LLM calls
-        if b.system == "camel" and b.variant == "policy":
-            continue
-        price = price_for(price_id(models[b.model]), pricing)
-        mult = CAMEL_TOKEN_MULTIPLIER if b.system == "camel" else 1.0
-        cost += mult * (per_task["input"] / 1e6 * price["input"]
-                        + per_task["output"] / 1e6 * price["output"])
-    return cost, f"{basis}. prices from {pricing['source']} retrieved {pricing['retrieved']}"
-
-
-def print_plan(to_run, cached, models, logdir, max_workers) -> None:
+def print_plan(to_run, cached, max_workers) -> None:
     counts = Counter((b.model, b.system, b.variant, b.suite, "benign" if is_benign(b) else "attack")
                      for b in to_run)
     header = f"{'model':<16}{'system':<11}{'variant':<10}{'suite':<11}{'benign':>7}{'attack':>7}"
@@ -257,8 +179,6 @@ def print_plan(to_run, cached, models, logdir, max_workers) -> None:
         a = counts.get((model, system, variant, suite, "attack"), 0)
         print(f"{model:<16}{system:<11}{variant:<10}{suite:<11}{b:>7}{a:>7}")
     print("-" * len(header))
-    cost, basis = estimate_cost(to_run, models, logdir)
     print(f"To run : {len(to_run)} task evaluations ({len(cached)} cached, skipped)")
-    print(f"Cost   : ~${cost:,.0f}  [{basis}]")
     print(f"Wall   : ~{-(-len(to_run) // max(max_workers, 1))} task-times "
           f"at --max-workers={max_workers}\n")

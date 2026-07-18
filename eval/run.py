@@ -226,7 +226,7 @@ def main() -> int:
         benchmarks = expand(list(models.values()), suites, attacks, args.repeats, systems)
         to_run, cached = split_cached(benchmarks, logdir)
         max_workers = args.max_workers or min(max(math.ceil(len(to_run) / 4), 1), 512)
-        print_plan(to_run, cached, models, logdir, max_workers)
+        print_plan(to_run, cached, max_workers)
         if args.plan_only:
             return 0
         if to_run:
