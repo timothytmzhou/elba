@@ -3,7 +3,7 @@
 import json
 import subprocess
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -13,7 +13,7 @@ sys.path.insert(0, str(EVAL_DIR))
 
 from benchmark import (  # noqa: E402
     Benchmark, REPO_ROOT, expand, pipeline_name, result_path, slug, split_cached)
-from config import AgentConfig, Model  # noqa: E402
+from config import AgentConfig, Model, on_bedrock  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
@@ -65,6 +65,14 @@ def test_split_cached(tmp_path):
     p.write_text(json.dumps({"utility": True, "security": True}))
     to_run, cached = split_cached([a1, a2], tmp_path)
     assert cached == [a1] and to_run == [a2]
+
+
+def test_on_bedrock():
+    m = model()
+    assert on_bedrock(m) == m  # no bedrock_model, keeps its API keys
+    b = on_bedrock(replace(m, bedrock_model="us.anthropic.claude-opus-4-7-20260416-v1:0"))
+    assert b.agent_config.modelName == "us.anthropic.claude-opus-4-7-20260416-v1:0"
+    assert b.camel_model == "bedrock:us.anthropic.claude-opus-4-7-20260416-v1:0"
 
 
 def test_newcombe_paired():

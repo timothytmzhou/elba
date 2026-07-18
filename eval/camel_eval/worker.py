@@ -27,8 +27,8 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
     from benchmark import result_path
     from run import run_agentdojo_task
 
-    if bedrock:
-        _use_bedrock(model.camel_model.split(":", 1)[1])
+    if bedrock and model.bedrock_model:
+        _use_bedrock(model.bedrock_model)
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
         model.camel_model,

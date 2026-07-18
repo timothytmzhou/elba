@@ -42,7 +42,7 @@ Drop a JSON into `configs/`:
 ```json
 { "modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0, "camel_model": "openai:gpt-5.4-2026-03-05" }
 ```
-One `AgentConfig` plus `camel_model`, named by its filename. Bedrock works via an `llm` plugin and the `--bedrock` flag, authenticating through the AWS chain (EC2 instance role plus `AWS_REGION`). No `camel_model` means TypeGuard only.
+One `AgentConfig` plus `camel_model`, named by its filename. No `camel_model` means TypeGuard only. Model names are their direct API form, run with provider API keys. `--bedrock` moves every model with a `bedrock_model` id onto Bedrock instead (an `llm` plugin on the TypeGuard side), authenticating through the AWS chain (EC2 instance role plus `AWS_REGION`); models without one keep their API keys.
 
 ## Prerequisites
 GHC/cabal to build the binary; the `llm` CLI with provider credentials; `uv` for CaMeL.

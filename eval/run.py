@@ -30,7 +30,7 @@ from benchmark import (  # noqa: E402
     ATTACKS, BENCHMARK_VERSION, Benchmark, REPO_ROOT, SUITES, TASK_TIMEOUT_S,
     expand, is_benign, pipeline_name, print_plan, result_path, slug, split_cached,
 )
-from config import Model, attack_persona, load_model  # noqa: E402
+from config import Model, attack_persona, load_model, on_bedrock  # noqa: E402
 from result import Outcome, RunReport  # noqa: E402
 
 
@@ -186,8 +186,9 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
 
 def run_worker_argv(argv: list[str]) -> None:
     bench = Benchmark(**json.loads(argv[2]))
+    bedrock = "--bedrock" in argv
     model = load_model(argv[3])
-    run_benchmark(bench, model, Path(argv[4]), argv[5], "--bedrock" in argv)
+    run_benchmark(bench, on_bedrock(model) if bedrock else model, Path(argv[4]), argv[5], bedrock)
 
 
 def main() -> int:
@@ -207,7 +208,7 @@ def main() -> int:
                     help="per task budget in seconds")
     ap.add_argument("--benchmark-version", default=BENCHMARK_VERSION)
     ap.add_argument("--bedrock", action="store_true",
-                    help="run the camel privileged LLM through Bedrock")
+                    help="run models with a bedrock_model id through Bedrock")
     ap.add_argument("--plan-only", action="store_true")
     ap.add_argument("--process-only", action="store_true")
     ap.add_argument("--yes", "-y", action="store_true")

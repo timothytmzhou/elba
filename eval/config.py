@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
@@ -22,12 +22,21 @@ class Model:
     name: str
     agent_config: AgentConfig
     camel_model: str | None = None  # None means typeguard only
+    bedrock_model: str | None = None  # the Bedrock id, taken under --bedrock
 
 
 def load_model(path: str | Path) -> Model:
     raw = json.loads(Path(path).read_text())
-    camel_model = raw.pop("camel_model", None)
-    return Model(name=Path(path).stem, agent_config=AgentConfig(**raw), camel_model=camel_model)
+    extra = {k: raw.pop(k, None) for k in ("camel_model", "bedrock_model")}
+    return Model(name=Path(path).stem, agent_config=AgentConfig(**raw), **extra)
+
+
+# Models without a bedrock_model keep their API keys.
+def on_bedrock(m: Model) -> Model:
+    if not m.bedrock_model:
+        return m
+    return replace(m, agent_config=replace(m.agent_config, modelName=m.bedrock_model),
+                   camel_model=m.camel_model and f"bedrock:{m.bedrock_model}")
 
 
 def attack_persona(m: Model) -> str:
