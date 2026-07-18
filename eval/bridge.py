@@ -86,6 +86,6 @@ class HaskellAgentPipeline:
             ChatUserMessage(role="user", content=[TextContentBlock(type="text", content=query)]),
             ChatAssistantMessage(role="assistant", tool_calls=tool_calls,
                                  content=[TextContentBlock(type="text", content=answer)])]
-        # log so the saved result carries the agent output
+        # Log so the saved result carries the agent output.
         Logger.get().log(new_messages)
         return answer, runtime, env, new_messages, extra_args

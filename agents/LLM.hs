@@ -29,7 +29,7 @@ data Config = Config
   -- ^ Recursion budget across the recursive `subagent` binding. Decremented
   --   on each recursive call; mkAgent refuses to call the LLM at depth <= 0.
   , llmCommand      :: Maybe FilePath
-  -- ^ The llm CLI to invoke where Nothing means llm on PATH and tests use this to substitute a scripted model.
+  -- ^ The llm CLI to invoke. Nothing means llm on PATH.
   }
 
 -- The default system prompt body lives in SystemPrompt.md so it can be

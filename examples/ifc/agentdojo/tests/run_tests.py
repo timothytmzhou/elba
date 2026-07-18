@@ -127,7 +127,7 @@ def _run_one(spec: TestSpec, runtime: FunctionsRuntime, env: Any) -> tuple[bool,
 
 
 def _make_assess(task: Any, secure: bool) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
-    # A secure reference finishing as blocked by IFC is expected since the Haskell main turns a LabelError into that message.
+    # Blocked by IFC is an expected secure outcome.
     def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
         if secure and ok and msg == "blocked by IFC":
             return True, "blocked by IFC (expected)"

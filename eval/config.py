@@ -1,5 +1,3 @@
-"""Model configs, loaded from configs/*.json."""
-
 from __future__ import annotations
 
 import json
@@ -7,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-# Mirrors the Haskell Config record written out as the binary config json.
+# Mirrors the Haskell Config record.
 @dataclass(frozen=True)
 class AgentConfig:
     modelName: str
@@ -19,12 +17,11 @@ class AgentConfig:
     llmCommand: str | None = None
 
 
-# A None camel_model means only typeguard can run this model.
 @dataclass(frozen=True)
 class Model:
     name: str
     agent_config: AgentConfig
-    camel_model: str | None = None
+    camel_model: str | None = None  # None means typeguard only
 
 
 def load_model(path: str | Path) -> Model:
@@ -33,7 +30,6 @@ def load_model(path: str | Path) -> Model:
     return Model(name=Path(path).stem, agent_config=AgentConfig(**raw), camel_model=camel_model)
 
 
-# The persona the injection attack impersonates.
 def attack_persona(m: Model) -> str:
     name = m.agent_config.modelName.lower()
     if "claude" in name or "anthropic" in name:

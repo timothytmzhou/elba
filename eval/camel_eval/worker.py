@@ -1,4 +1,4 @@
-# Runs one benchmark on CaMeL inside the checkout venv where nopolicy is a fresh pass and policy replays it.
+# The policy variant replays the recording the nopolicy variant wrote.
 import os
 import tempfile
 from pathlib import Path
@@ -12,7 +12,7 @@ camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
 def _use_bedrock(bedrock_model: str) -> None:
-    # Swaps in the Bedrock client under the upstream anthropic path and keeps the full model id upstream would truncate.
+    # Swaps the Bedrock client in under the upstream anthropic path, keeping the full model id upstream would truncate.
     os.environ.setdefault("ANTHROPIC_API_KEY", "unused-on-bedrock")
     base = camel.models.agent_pipeline.AnthropicLLM
 
@@ -23,12 +23,12 @@ def _use_bedrock(bedrock_model: str) -> None:
     camel.models.agent_pipeline.AnthropicLLM = BedrockAnthropicLLM
 
 
-def run_camel(bench, model, logdir, benchmark_version):
+def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
     from benchmark import result_path
     from run import run_agentdojo_task
 
-    if model.camel_model.startswith("bedrock:"):
-        _use_bedrock(model.camel_model.removeprefix("bedrock:"))
+    if bedrock:
+        _use_bedrock(model.camel_model.split(":", 1)[1])
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
         model.camel_model,
@@ -43,13 +43,13 @@ def run_camel(bench, model, logdir, benchmark_version):
         None,  # q_llm
     )
     if replay:
-        # the replayer reads recordings from a logs dir relative to cwd.
+        # The replayer reads recordings from a logs dir relative to cwd.
         tmp = tempfile.mkdtemp()
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
     run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
 
-    # camel writes under its own upstream pipeline name so copy it to ours.
+    # CaMeL writes under its own pipeline name, copy the result to ours.
     src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id
            / bench.attack / f"{bench.injection_task_id}.json")
     dst = result_path(bench, logdir)

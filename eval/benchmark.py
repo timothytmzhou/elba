@@ -1,11 +1,7 @@
-"""The run matrix and the upfront plan.
+"""A Benchmark is one AgentDojo task evaluation.
 
-A Benchmark is one AgentDojo task evaluation. Benchmarks are independent so
-the eval is embarrassingly parallel. Results land at
-
-    <logdir>/rep<r>/<pipeline>/<suite>/<task>/<attack>/<injection>.json
-
-which also serves as the resume cache.
+Results land at <logdir>/rep<r>/<pipeline>/<suite>/<task>/<attack>/<injection>.json
+which doubles as the resume cache.
 """
 
 from __future__ import annotations
@@ -26,7 +22,6 @@ ATTACKS = ("direct", "important_instructions")
 BENCHMARK_VERSION = "v1.2.2"
 TASK_TIMEOUT_S = 600
 
-# Suites that have a written typeguard IFC policy.
 TYPEGUARD_POLICY_SUITES = {"slack"}
 
 

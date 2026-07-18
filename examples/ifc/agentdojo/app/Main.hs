@@ -28,7 +28,6 @@ suites =
   [ ("slack", (["SlackTCB", "WebTCB"], ["Slack", "Web", "IFC"]))
   ]
 
--- Information flow guidance appended to the secure agent system prompt.
 ifcGuidance :: String
 ifcGuidance =
   $( do

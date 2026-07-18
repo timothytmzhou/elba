@@ -1,5 +1,3 @@
-"""One task evaluation's output, and the run tally."""
-
 from __future__ import annotations
 
 import json
@@ -8,14 +6,13 @@ from enum import Enum
 from pathlib import Path
 
 
-# Utility False with an error covers denials and timeouts.
 @dataclass(frozen=True)
 class Result:
     utility: bool
     security: bool
     duration_s: float | None = None
     tokens: dict | None = None
-    error: str | None = None
+    error: str | None = None  # denials and timeouts land here, scored utility False
     final_output: str | None = None
     messages: list = field(default_factory=list)
     agent_transcript: str | None = None

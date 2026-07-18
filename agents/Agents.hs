@@ -25,7 +25,7 @@ import Language.Haskell.Interpreter qualified as Hint
 import Language.Haskell.Interpreter.Unsafe (unsafeInterpret, unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
 
--- Tool name to signature and optional docstring shown to the model.
+-- | Tool name to signature and optional docstring, shown to the model.
 newtype TypeEnv = TypeEnv (Map String (String, Maybe String))
 
 instance Show TypeEnv where
@@ -52,11 +52,11 @@ setEnv env tools = do
   sigs <- mapM (typeOf . parenIfOp . toolName) values
   pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
 
--- In scope unqualified like Prelude so emitted code can spawn subagents.
+-- | In scope unqualified, so emitted code can call subagent.
 baseModules :: [ModuleName]
 baseModules = ["Prelude", "Agents"]
 
--- Ambient base vocabulary qualified so name clashes are impossible.
+-- | Ambient base vocabulary, qualified so name clashes are impossible.
 qualifiedModules :: [ModuleName]
 qualifiedModules =
   [ "Control.Applicative"
@@ -76,7 +76,6 @@ qualifiedModules =
   , "Text.Read"
   ]
 
--- Wraps operator names in parens for import lists and typeOf queries.
 parenIfOp :: String -> String
 parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
 parenIfOp s = s
@@ -90,7 +89,7 @@ buildContext reqType typeEnv task =
     , "Allowed functions: " ++ show typeEnv
     ]
 
--- | Rewrites alias sources to targets since TypeRep renders synonyms expanded.
+-- | Rewrites alias sources to targets. TypeRep renders synonyms expanded.
 applyAliases :: [(String, String)] -> String -> String
 applyAliases aliases s0 = foldl (flip sub) s0 aliases
   where
@@ -129,7 +128,7 @@ setupInterp env = do
   set [searchPath := []]
   set [languageExtensions := map (Hint.UnknownExtension . show) (extensions env)]
 
--- The interpreter keeps its own copy of this module so this slot is seeded through setContext.
+-- | Written through setContext because the interpreter keeps its own copy of this module.
 {-# NOINLINE contextRef #-}
 contextRef :: IORef (Config, Env)
 contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run"))
@@ -138,7 +137,7 @@ contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run
 setContext :: Config -> Env -> IO ()
 setContext config env = writeIORef contextRef (config, env)
 
--- | Spawns a nested agent on the running context and each spawn decrements maxDepth to cap nesting.
+-- | Spawns a nested agent on the running agent context. Each spawn decrements maxDepth.
 subagent :: (Typeable a) => String -> String -> a
 subagent task input = unsafePerformIO $ do
   (config, env) <- readIORef contextRef

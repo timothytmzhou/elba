@@ -1,11 +1,4 @@
-"""Turn the result tree into the raw dump and the LaTeX tables.
-
-Reads only what the runner wrote. Writes under <logdir>/results/.
-
-    dump.jsonl                everything tracked per task evaluation
-    table_<suite>.tex         the paper table for one suite
-    confidence_intervals.tex  TypeGuard minus CaMeL paired difference CIs
-"""
+"""Turn the result tree into dump.jsonl and the LaTeX tables under <logdir>/results."""
 
 from __future__ import annotations
 

@@ -3,9 +3,7 @@
 
     python eval/run.py --models eval/configs/*.json
 
-Prints the plan, runs every remaining benchmark in parallel, then processes
-results into the raw dump and the LaTeX tables. Resumable. Each benchmark
-runs as its own worker process, python run.py worker '<spec json>'.
+Each benchmark runs as its own worker process.
 """
 
 from __future__ import annotations
@@ -56,11 +54,12 @@ def _llm_token_usage(llm_user_dir: Path) -> dict | None:
         return None
 
 
-def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
+def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str,
+                  bedrock: bool = False) -> None:
     if bench.system == "camel":
         from camel_eval.worker import run_camel
 
-        run_camel(bench, model, logdir, benchmark_version)
+        run_camel(bench, model, logdir, benchmark_version, bedrock)
     else:
         run_typeguard(bench, model, logdir, benchmark_version)
     print(f"[done] {slug(bench)}", flush=True)
@@ -78,7 +77,7 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
 
     TaskResults.model_rebuild()
     rep_dir = logdir / f"rep{bench.rep}"
-    # important_instructions embeds a model name matched against MODEL_NAMES
+    # important_instructions embeds a model name matched against MODEL_NAMES.
     persona = attack_persona(model)
     MODEL_NAMES.setdefault(pipeline.name, persona)
     MODEL_NAMES.setdefault(pipeline.name.removesuffix("+secpol"), persona)
@@ -125,8 +124,10 @@ def typeguard_exe() -> str:
                                    text=True).strip().splitlines()[-1]
 
 
-def _worker_cmd(bench: Benchmark, config_path: str, logdir: Path, benchmark_version: str) -> list[str]:
+def _worker_cmd(bench: Benchmark, config_path: str, logdir: Path, benchmark_version: str,
+                bedrock: bool) -> list[str]:
     args = ["worker", json.dumps(asdict(bench)), config_path, str(logdir), benchmark_version]
+    args += ["--bedrock"] if bedrock else []
     if bench.system == "typeguard":
         return [sys.executable, __file__, *args]
     return camel_eval.worker_cmd(args)
@@ -154,17 +155,16 @@ def _record_timeout(bench: Benchmark, logdir: Path, timeout_s: int) -> None:
                                 "duration": float(timeout_s)}))
 
 
-# configs maps a model name to the config file each worker loads itself.
 def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir: Path,
                    benchmark_version: str, timeout_s: int, max_workers: int,
-                   build: bool = True) -> RunReport:
+                   build: bool = True, bedrock: bool = False) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
     if build and any(b.system == "typeguard" for b in benchmarks):
         build_typeguard()
 
     def run_task(bench: Benchmark) -> Outcome:
-        cmd = _worker_cmd(bench, configs[bench.model], logdir, benchmark_version)
+        cmd = _worker_cmd(bench, configs[bench.model], logdir, benchmark_version, bedrock)
         outcome = run_with_timeout(cmd, logdir / ".workers" / f"{slug(bench)}.log", timeout_s)
         match outcome:
             case Outcome.TIMEOUT:
@@ -174,7 +174,7 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
                 pass
         return outcome
 
-    # The camel policy replay runs as a second wave after the record wave writes its logs.
+    # The policy replay runs as a second wave over the recordings of the first.
     record = [b for b in benchmarks if not (b.system == "camel" and b.variant == "policy")]
     replay = [b for b in benchmarks if b.system == "camel" and b.variant == "policy"]
     tally = Counter()
@@ -187,7 +187,7 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
 def run_worker_argv(argv: list[str]) -> None:
     bench = Benchmark(**json.loads(argv[2]))
     model = load_model(argv[3])
-    run_benchmark(bench, model, Path(argv[4]), argv[5])
+    run_benchmark(bench, model, Path(argv[4]), argv[5], "--bedrock" in argv)
 
 
 def main() -> int:
@@ -206,6 +206,8 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=TASK_TIMEOUT_S,
                     help="per task budget in seconds")
     ap.add_argument("--benchmark-version", default=BENCHMARK_VERSION)
+    ap.add_argument("--bedrock", action="store_true",
+                    help="run the camel privileged LLM through Bedrock")
     ap.add_argument("--plan-only", action="store_true")
     ap.add_argument("--process-only", action="store_true")
     ap.add_argument("--yes", "-y", action="store_true")
@@ -238,7 +240,8 @@ def main() -> int:
                 if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
                     return 1
             report = run_benchmarks(to_run, configs, logdir, args.benchmark_version,
-                                    args.timeout, max_workers, build=not args.no_build)
+                                    args.timeout, max_workers, build=not args.no_build,
+                                    bedrock=args.bedrock)
             print(f"\nRun finished: {report.completed} completed, "
                   f"{report.timeout} timed out.")
 

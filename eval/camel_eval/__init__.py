@@ -1,9 +1,4 @@
-"""Self contained CaMeL baseline.
-
-The checkout at <repo>/camel is a pristine clone of camel-prompt-injection.
-The runner calls ensure_checkout and worker_cmd, and the worker module
-builds pipelines inside the checkout's own venv.
-"""
+"""The checkout at <repo>/camel is a pristine clone of camel-prompt-injection."""
 
 from __future__ import annotations
 
@@ -37,7 +32,6 @@ def ensure_checkout() -> Path:
 
 
 def worker_cmd(worker_args: list[str]) -> list[str]:
-    # worker_args holds the worker tag benchmark json logdir and benchmark version.
     uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
     return [uv, "run", "--project", str(CHECKOUT), "--env-file", str(CHECKOUT / ".env"),
             "python", str(HERE.parent / "run.py"), *worker_args]

@@ -24,7 +24,7 @@ import GHC.Paths (libdir)
 import GHC.Types.Name (Name, getOccString)
 import GHC.Utils.Logger (getLogger)
 
--- | Reads each module exports and Haddock from its interface file and needs libraries built with the haddock flag.
+-- | Reads module exports and Haddock from interface files. Needs libraries built with the haddock flag.
 resolveTools :: Env -> IO [ResolvedTool]
 resolveTools env =
   runGhc (Just libdir) $ do

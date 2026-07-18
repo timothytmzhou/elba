@@ -9,7 +9,7 @@ module IFC
   )
 where
 
-import LIO (evalLIO, getClearance, glb, setClearance, taint)
+import LIO (LIO, Label, evalLIO, getClearance, glb, setClearance, taint)
 import LIO.DCLabel (DC, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
 import LIO.TCB
   ( LIOState (..),
@@ -23,8 +23,8 @@ runDC :: DC a -> IO a
 runDC m =
   evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
--- | Runs a computation without tainting the current label.
-toLabeled :: DC a -> DC (DCLabeled a)
+-- | Runs a LIO computation without tainting the current label.
+toLabeled :: (Label l) => LIO l a -> LIO l (Labeled l a)
 toLabeled action = do
   s0 <- getLIOStateTCB
   a <- action
