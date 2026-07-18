@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import anthropic
+import openai
 import camel.models
 from camel.interpreter.interpreter import MetadataEvalMode
 
@@ -12,15 +13,25 @@ camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
 def _use_bedrock(bedrock_model: str) -> None:
-    # Swaps the Bedrock client in under the upstream anthropic path, keeping the full model id upstream would truncate.
+    # Swaps Bedrock clients in under the upstream provider paths, keeping the full model id upstream would truncate.
     os.environ.setdefault("ANTHROPIC_API_KEY", "unused-on-bedrock")
-    base = camel.models.agent_pipeline.AnthropicLLM
+    os.environ.setdefault("OPENAI_API_KEY", "unused-on-bedrock")
+    anthropic_base = camel.models.agent_pipeline.AnthropicLLM
+    openai_base = camel.models.agent_pipeline.OpenAILLM
 
-    class BedrockAnthropicLLM(base):
+    class BedrockAnthropicLLM(anthropic_base):
         def __init__(self, client, model, **kwargs):
             super().__init__(anthropic.AsyncAnthropicBedrock(), bedrock_model, **kwargs)
 
+    class BedrockOpenAILLM(openai_base):
+        def __init__(self, client, model, *args, **kwargs):
+            client = openai.OpenAI(
+                base_url=f"https://bedrock-runtime.{os.environ['AWS_REGION']}.amazonaws.com/openai/v1",
+                api_key=os.environ["AWS_BEARER_TOKEN_BEDROCK"])
+            super().__init__(client, bedrock_model, *args, **kwargs)
+
     camel.models.agent_pipeline.AnthropicLLM = BedrockAnthropicLLM
+    camel.models.agent_pipeline.OpenAILLM = BedrockOpenAILLM
 
 
 def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
