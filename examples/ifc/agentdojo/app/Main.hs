@@ -27,9 +27,6 @@ $(deriveFromJSON defaultOptions ''Config)
 suites :: [(String, ([String], [String]))]
 suites =
   [ ("slack", (["SlackTCB", "WebTCB"], ["Slack", "Web", "IFC"]))
-  , ("workspace", (["WorkspaceTCB"], ["Workspace", "IFC"]))
-  , ("travel", (["TravelTCB"], ["Travel", "IFC"]))
-  , ("banking", (["BankingTCB"], ["Banking", "IFC"]))
   ]
 
 -- Information flow guidance appended to the secure agents' system prompt.

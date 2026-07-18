@@ -15,26 +15,17 @@ library
     IFC
     Policy
     -- AgentDojo suite bindings
-    Banking
-    BankingTCB
     Slack
     SlackLabelTCB
     SlackPrincipal
     SlackTCB
-    Travel
-    TravelTCB
     Web
     WebTCB
-    Workspace
-    WorkspaceTCB
 
   hs-source-dirs:
     lib
     agentdojo
     agentdojo/slack
-    agentdojo/workspace
-    agentdojo/travel
-    agentdojo/banking
   default-language: GHC2024
   ghc-options:      -haddock
   build-depends:
