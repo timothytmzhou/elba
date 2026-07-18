@@ -1,0 +1,11 @@
+{
+  "name": "nova-pro",
+  "display": "Nova Pro (Bedrock)",
+  "attack_model_name": "AI assistant",
+  "agent_config": {
+    "modelName": "us.amazon.nova-pro-v1:0",
+    "systemPrompt": "",
+    "maxAttempts": 3,
+    "maxDepth": 10
+  }
+}

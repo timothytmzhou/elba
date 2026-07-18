@@ -15,7 +15,8 @@ import System.Process (readProcess)
 
 data Config = Config
   { modelName       :: Maybe String
-  , seed            :: Integer
+  , seed            :: Maybe Integer
+  -- ^ Nothing skips the flag, for providers without a seed option.
   , reasoningEffort :: Maybe String
   -- ^ For reasoning models (e.g. gpt-5.x): "low" | "medium" | "high".
   --   Nothing skips the flag and uses the provider default.
@@ -46,7 +47,7 @@ defaultSystemPrompt =
 defaultConfig :: Config
 defaultConfig = Config
   { modelName       = Just "gpt-5.4"
-  , seed            = 0
+  , seed            = Just 0
   , reasoningEffort = Just "high"
   , systemPrompt    = defaultSystemPrompt
   , logPath         = Nothing
@@ -60,7 +61,9 @@ toArgs Config {modelName, seed, reasoningEffort} = modelArgs ++ seedArgs ++ effo
     modelArgs = case modelName of
       Nothing   -> []
       Just name -> ["-m", name]
-    seedArgs = ["-o", "seed", show seed]
+    seedArgs = case seed of
+      Nothing -> []
+      Just s  -> ["-o", "seed", show s]
     effortArgs = case reasoningEffort of
       Nothing -> []
       Just e  -> ["-o", "reasoning_effort", e]

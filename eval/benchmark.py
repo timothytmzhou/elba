@@ -20,7 +20,7 @@ EVAL_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EVAL_DIR.parent
 
 BENIGN = "none"
-SUITES = ("slack", "workspace", "travel", "banking")
+SUITES = ("slack",)
 ATTACKS = ("direct", "important_instructions")
 BENCHMARK_VERSION = "v1.2.2"
 TASK_TIMEOUT_S = 600
@@ -35,21 +35,23 @@ CAMEL_TOKEN_MULTIPLIER = 1.5
 
 
 # Mirrors the Haskell Config record, written out as the binary's config.json.
+# A None seed skips the llm seed option, which some providers lack.
 @dataclass(frozen=True)
 class AgentConfig:
     modelName: str
-    seed: int
     systemPrompt: str
     maxAttempts: int
     maxDepth: int
+    seed: int | None = None
     reasoningEffort: str | None = None
 
 
+# A None camel_model means CaMeL cannot run this model, typeguard only.
 @dataclass(frozen=True)
 class Model:
     name: str
-    camel_model: str
     agent_config: AgentConfig
+    camel_model: str | None = None
     display: str = ""
     camel_reasoning: bool = False
     attack_model_name: str = "AI assistant"
@@ -58,7 +60,7 @@ class Model:
 def load_model(path: str | Path) -> Model:
     raw = json.loads(Path(path).read_text())
     return Model(
-        name=raw["name"], camel_model=raw["camel_model"],
+        name=raw["name"], camel_model=raw.get("camel_model"),
         agent_config=AgentConfig(**raw["agent_config"]),
         display=raw.get("display") or raw["name"],
         camel_reasoning=raw.get("camel_reasoning", False),
@@ -110,6 +112,8 @@ def expand(models: list[Model], suites: list[str], attacks: list[str], repeats: 
         user_tasks, injection_tasks = suite_tasks(suite)
         for model in models:
             for system in systems:
+                if system == "camel" and not model.camel_model:
+                    continue
                 variants = (["nopolicy"] if system == "typeguard"
                             and suite not in TYPEGUARD_POLICY_SUITES else ["policy", "nopolicy"])
                 for variant in variants:
@@ -186,16 +190,20 @@ def load_pricing() -> dict:
     models = {name: {"input": m["input_cost_per_token"] * 1e6,
                      "output": m["output_cost_per_token"] * 1e6}
               for name, m in raw.items()
-              if m.get("litellm_provider") == "openai"
+              if m.get("litellm_provider") in ("openai", "bedrock", "bedrock_converse")
               and "input_cost_per_token" in m and "output_cost_per_token" in m}
     pricing = {"source": PRICING_URL, "retrieved": time.strftime("%Y-%m-%d"), "models": models}
     PRICING_CACHE.write_text(json.dumps(pricing, indent=1))
     return pricing
 
 
-def price_for(camel_model: str, pricing: dict) -> dict:
+# The model id the price table is keyed by, from camel or the llm CLI name.
+def price_id(m: Model) -> str:
+    return m.camel_model.split(":", 1)[1] if m.camel_model else m.agent_config.modelName
+
+
+def price_for(model_id: str, pricing: dict) -> dict:
     # Dated snapshots like gpt-5.4-2026-03-05 fall back to the gpt-5.4 row.
-    model_id = camel_model.split(":")[1]
     table = pricing["models"]
     if model_id in table:
         return table[model_id]
@@ -232,7 +240,7 @@ def estimate_cost(benchmarks, models, logdir) -> tuple[float, str]:
         # camel policy replays the recorded run and costs no LLM calls
         if b.system == "camel" and b.variant == "policy":
             continue
-        price = price_for(models[b.model].camel_model, pricing)
+        price = price_for(price_id(models[b.model]), pricing)
         mult = CAMEL_TOKEN_MULTIPLIER if b.system == "camel" else 1.0
         cost += mult * (per_task["input"] / 1e6 * price["input"]
                         + per_task["output"] / 1e6 * price["output"])

@@ -1,8 +1,7 @@
 # AgentDojo evaluation
 
 One command runs the full evaluation — TypeGuard and CaMeL, with and without
-IFC policies, benign and under attack, all AgentDojo suites — and produces
-the paper outputs:
+IFC policies, benign and under attack — and produces the paper outputs:
 
 ```bash
 python eval/run.py --models eval/configs/*.json
@@ -69,15 +68,14 @@ convention for failures).
 |---------|-------------------------------------------------------------------|
 | system  | `typeguard` (ours), `camel`                                       |
 | variant | `policy`, `nopolicy` — both run under attack (fills Table 2's gap) |
-| suite   | `slack`, `workspace`, `travel`, `banking`                         |
+| suite   | `slack` (more suites land as their bindings do)                   |
 | attack  | none + `direct`, `important_instructions`                         |
 | repeats | `--repeats k` (default 1 = pass@1)                                 |
 
-TypeGuard's `policy` variant only runs on suites whose IFC policies exist —
-currently slack (`benchmark.TYPEGUARD_POLICY_SUITES`). The other suites'
-secure surfaces are `undefined` placeholders to be written by hand
-(`examples/ifc/agentdojo/{workspace,travel,banking}/<Suite>.hs`); their
-no-policy variants run everywhere. CaMeL ships policies for all four suites.
+TypeGuard's `policy` variant only runs on suites whose IFC policies exist
+(`benchmark.TYPEGUARD_POLICY_SUITES`). Adding a suite means writing its
+tool bindings under `examples/ifc/agentdojo/<suite>/`, registering it in
+the binary's suite table, and adding it to `benchmark.SUITES`.
 
 ## Adding a model
 
@@ -96,6 +94,12 @@ Drop a JSON into `configs/`:
 
 (the plan refuses to guess prices for unknown models, delete
 `eval/pricing.json` to refetch).
+
+Any model the `llm` CLI can reach works for TypeGuard. For Amazon Bedrock
+install a plugin (`llm install llm-bedrock` for Nova) and use its model id
+as `modelName`, with AWS credentials in the environment or `llm keys set
+bedrock`. Omit `camel_model` and `seed` for providers without them; a model
+without `camel_model` runs TypeGuard only (see `configs/nova-pro.json`).
 
 ## Prerequisites
 
