@@ -15,7 +15,8 @@ import System.Process (readProcess)
 
 data Config = Config
   { modelName       :: Maybe String
-  , seed            :: Integer
+  , seed            :: Maybe Integer
+  -- ^ Nothing skips the flag for providers without a seed option.
   , reasoningEffort :: Maybe String
   -- ^ For reasoning models (e.g. gpt-5.x): "low" | "medium" | "high".
   --   Nothing skips the flag and uses the provider default.
@@ -27,6 +28,8 @@ data Config = Config
   , maxDepth        :: Int
   -- ^ Recursion budget across the recursive `subagent` binding. Decremented
   --   on each recursive call; mkAgent refuses to call the LLM at depth <= 0.
+  , llmCommand      :: Maybe FilePath
+  -- ^ The llm CLI to invoke. Nothing means llm on PATH.
   }
 
 -- The default system prompt body lives in SystemPrompt.md so it can be
@@ -46,12 +49,13 @@ defaultSystemPrompt =
 defaultConfig :: Config
 defaultConfig = Config
   { modelName       = Just "gpt-5.4"
-  , seed            = 0
+  , seed            = Just 0
   , reasoningEffort = Just "high"
   , systemPrompt    = defaultSystemPrompt
   , logPath         = Nothing
   , maxAttempts     = 3
-  , maxDepth        = 7
+  , maxDepth        = 10
+  , llmCommand      = Nothing
   }
 
 toArgs :: Config -> [String]
@@ -60,7 +64,9 @@ toArgs Config {modelName, seed, reasoningEffort} = modelArgs ++ seedArgs ++ effo
     modelArgs = case modelName of
       Nothing   -> []
       Just name -> ["-m", name]
-    seedArgs = ["-o", "seed", show seed]
+    seedArgs = case seed of
+      Nothing -> []
+      Just s  -> ["-o", "seed", show s]
     effortArgs = case reasoningEffort of
       Nothing -> []
       Just e  -> ["-o", "reasoning_effort", e]
@@ -68,9 +74,10 @@ toArgs Config {modelName, seed, reasoningEffort} = modelArgs ++ seedArgs ++ effo
 withSession :: Config -> IO (String -> IO String)
 withSession config = do
   let base = toArgs config ++ ["--no-stream"]
+      cli = maybe "llm" id (llmCommand config)
   first <- newIORef True
   pure $ \msg -> do
     isFirst <- readIORef first
     writeIORef first False
     let continueArgs = if isFirst then ["-s", systemPrompt config] else ["-c"]
-    readProcess "llm" (base ++ continueArgs) msg
+    readProcess cli (base ++ continueArgs) msg

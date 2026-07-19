@@ -1,8 +1,0 @@
-{
-  "modelName": "o4-mini",
-  "reasoningEffort": "medium",
-  "seed": 0,
-  "systemPrompt": "",
-  "maxAttempts": 3,
-  "maxDepth": 7
-}

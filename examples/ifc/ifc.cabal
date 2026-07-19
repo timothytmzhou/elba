@@ -1,18 +1,20 @@
 cabal-version: 3.0
 name:          ifc
 version:       0.1.0.0
-synopsis:      Bindings for AgentDojo's slack default suite
+synopsis:      Language based agent control with IFC, and AgentDojo bindings
 license:       MIT
 build-type:    Simple
 
 extra-source-files:
-  IfcGuidance.md
+  agentdojo/IfcGuidance.md
 
 library
   exposed-modules:
+    -- general IFC library and bridge
     Bridge
     IFC
     Policy
+    -- AgentDojo suite bindings
     Slack
     SlackLabelTCB
     SlackPrincipal
@@ -20,7 +22,10 @@ library
     Web
     WebTCB
 
-  hs-source-dirs:   lib, slack, slack/policy
+  hs-source-dirs:
+    lib
+    agentdojo
+    agentdojo/slack
   default-language: GHC2024
   ghc-options:      -haddock
   build-depends:
@@ -32,21 +37,9 @@ library
     lio,
     text
 
-executable agentdojo-slack
+executable agentdojo
   main-is:          Main.hs
-  hs-source-dirs:   slack/app
-  default-language: GHC2024
-  build-depends:
-    aeson,
-    agents,
-    base >= 4.20 && < 5,
-    bytestring,
-    ifc,
-    template-haskell
-
-executable agentdojo-slack-secure
-  main-is:          MainSecure.hs
-  hs-source-dirs:   slack/app
+  hs-source-dirs:   agentdojo/app
   default-language: GHC2024
   build-depends:
     aeson,
@@ -55,24 +48,20 @@ executable agentdojo-slack-secure
     bytestring,
     filepath,
     ifc,
-    lio,
     template-haskell
 
 executable agentdojo-slack-reference
   main-is:          Reference.hs
-  hs-source-dirs:   tests
+  hs-source-dirs:   agentdojo/tests
   default-language: GHC2024
   build-depends:
-    agents,
     base >= 4.20 && < 5,
     ifc
 
 executable agentdojo-slack-secure-reference
   main-is:          SecureReference.hs
-  hs-source-dirs:   tests
+  hs-source-dirs:   agentdojo/tests
   default-language: GHC2024
   build-depends:
-    agents,
     base >= 4.20 && < 5,
-    ifc,
-    lio
+    ifc

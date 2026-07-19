@@ -2,30 +2,26 @@
 
 module IFC
   ( DC,
-    LIOState (..),
-    evalLIO,
-    initialState,
+    DCLabeled,
+    runDC,
     toLabeled,
     unlabel,
   )
 where
 
-import LIO (LIO, LIOState (..), Label, evalLIO, getClearance, glb, setClearance, taint)
-import LIO.DCLabel (DC, DCLabel, cFalse, cTrue, dcIntegrity, (%%))
-import LIO.Labeled (Labeled)
+import LIO (LIO, Label, evalLIO, getClearance, glb, setClearance, taint)
+import LIO.DCLabel (DC, DCLabeled, cFalse, cTrue, dcIntegrity, (%%))
 import LIO.TCB
-  ( LIOState (lioClearance, lioLabel),
+  ( LIOState (..),
     Labeled (LabeledTCB),
     getLIOStateTCB,
     putLIOStateTCB,
   )
 
-initialState :: LIOState DCLabel
-initialState =
-  LIOState
-    { lioLabel = cTrue %% cFalse,
-      lioClearance = cFalse %% cTrue
-    }
+-- | Runs a DC computation from a public trusted starting label.
+runDC :: DC a -> IO a
+runDC m =
+  evalLIO m LIOState {lioLabel = cTrue %% cFalse, lioClearance = cFalse %% cTrue}
 
 -- | Runs a LIO computation without tainting the current label.
 toLabeled :: (Label l) => LIO l a -> LIO l (Labeled l a)
@@ -37,7 +33,7 @@ toLabeled action = do
   return (LabeledTCB (lioLabel s1) a)
 
 -- | Unlabels a labeled value, tainting the current label and lowering clearance.
-unlabel :: Labeled DCLabel a -> DC a
+unlabel :: DCLabeled a -> DC a
 unlabel (LabeledTCB l v) = do
   c <- getClearance
   setClearance (c `glb` (dcIntegrity l %% cTrue))

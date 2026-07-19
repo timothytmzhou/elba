@@ -1,29 +1,104 @@
 {-# LANGUAGE Trustworthy #-}
 
 module Agents
-  ( Env
+  ( Config
+  , Env
   , mkAgent
+  , setContext
+  , subagent
   ) where
 
 import Control.Monad.Catch (try)
+import Data.Char (isAlpha)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.List (isPrefixOf)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
+import Docs (resolveTools)
 import Env
 import GHC.IO (unsafePerformIO)
 import LLM
 import Language.Haskell.Interpreter hiding (Extension)
 import Language.Haskell.Interpreter qualified as Hint
-import Language.Haskell.Interpreter.Unsafe (unsafeRunInterpreterWithArgs)
+import Language.Haskell.Interpreter.Unsafe (unsafeInterpret, unsafeRunInterpreterWithArgs)
 import Log (Event (..), Log, logEvent, withLog)
 
-buildContext :: forall a. (Typeable a) => Proxy a -> TypeEnv -> String -> String
-buildContext proxy typeEnv task =
+-- | Tool name to signature and optional docstring, shown to the model.
+newtype TypeEnv = TypeEnv (Map String (String, Maybe String))
+
+instance Show TypeEnv where
+  show (TypeEnv m) =
+    unlines
+      [ entry name sig mDoc
+      | (name, (sig, mDoc)) <- Map.toList m
+      ]
+    where
+      entry name sig Nothing = name ++ " :: " ++ sig
+      entry name sig (Just doc) =
+        name
+          ++ " :: "
+          ++ sig
+          ++ "\n"
+          ++ unlines ["    " ++ ln | ln <- lines doc]
+
+setEnv :: Env -> [ResolvedTool] -> Interpreter TypeEnv
+setEnv env tools = do
+  setImportsF $
+    [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
+      ++ [ModuleImport m (QualifiedAs Nothing) NoImportList | m <- qualifiedModules]
+  let values = [t | t <- tools, toolIsValue t]
+  sigs <- mapM (typeOf . parenIfOp . toolName) values
+  pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
+
+-- | In scope unqualified, so emitted code can call subagent.
+baseModules :: [ModuleName]
+baseModules = ["Prelude", "Agents"]
+
+-- | Ambient base vocabulary, qualified so name clashes are impossible.
+qualifiedModules :: [ModuleName]
+qualifiedModules =
+  [ "Control.Applicative"
+  , "Control.Monad"
+  , "Data.Bifunctor"
+  , "Data.Char"
+  , "Data.Either"
+  , "Data.Foldable"
+  , "Data.Function"
+  , "Data.Functor"
+  , "Data.List"
+  , "Data.Maybe"
+  , "Data.Ord"
+  , "Data.Traversable"
+  , "Data.Tuple"
+  , "Text.Printf"
+  , "Text.Read"
+  ]
+
+parenIfOp :: String -> String
+parenIfOp s@(c : _) | not (isAlpha c) && c /= '_' = "(" ++ s ++ ")"
+parenIfOp s = s
+
+buildContext :: String -> TypeEnv -> String -> String
+buildContext reqType typeEnv task =
   unlines
     [ task
     , ""
-    , "Required type: " ++ show (typeRep proxy)
+    , "Required type: " ++ reqType
     , "Allowed functions: " ++ show typeEnv
     ]
+
+-- | Rewrites alias sources to targets. TypeRep renders synonyms expanded.
+applyAliases :: [(String, String)] -> String -> String
+applyAliases aliases s0 = foldl (flip sub) s0 aliases
+  where
+    sub (from, to) = go
+      where
+        go [] = []
+        go s@(c : cs)
+          | from `isPrefixOf` s = to ++ go (drop (length from) s)
+          | otherwise = c : go cs
 
 retryMessage :: String -> String
 retryMessage errStr =
@@ -35,11 +110,7 @@ retryMessage errStr =
     , "Re-emit a corrected Haskell expression of the required type."
     ]
 
--- | Strip a markdown code fence around the LLM's emission. If the response
--- contains lines whose first non-space chars are "```", return the content
--- between the first and second such lines. Otherwise return the input
--- unchanged. Handles ```haskell ... ```, bare ``` ... ```, and prose
--- surrounding the fenced block.
+-- | Strips a markdown code fence around the LLM emission if present.
 stripFence :: String -> String
 stripFence s
   | not (any isFence ls) = s
@@ -57,37 +128,58 @@ setupInterp env = do
   set [searchPath := []]
   set [languageExtensions := map (Hint.UnknownExtension . show) (extensions env)]
 
+-- | Written through setContext because the interpreter keeps its own copy of this module.
+{-# NOINLINE contextRef #-}
+contextRef :: IORef (Config, Env)
+contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run"))
+
+-- | Writes contextRef in the interpreted copy of this module.
+setContext :: Config -> Env -> IO ()
+setContext config env = writeIORef contextRef (config, env)
+
+-- | Spawns a nested agent on the running agent context. Each spawn decrements maxDepth.
+subagent :: (Typeable a) => String -> String -> a
+subagent task input = unsafePerformIO $ do
+  (config, env) <- readIORef contextRef
+  pure (mkAgent config env (task ++ "\n<input>\n" ++ input ++ "\n</input>"))
+
 mkAgent :: forall a. (Typeable a) => Config -> Env -> String -> a
 mkAgent config _ _
   | LLM.maxDepth config <= 0 = error "Agents.mkAgent: recursion depth exceeded"
 mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
     ask <- withSession config
-    result <- unsafeRunInterpreterWithArgs ["-package", "template-haskell", "-XSafe"] $ do
+    tools <- maybe (resolveTools env) pure (resolvedTools env)
+    result <- unsafeRunInterpreterWithArgs ["-XSafe"] $ do
       setupInterp env
-      typeEnv <- setEnv env baseModules
-      let ctx = buildContext (Proxy :: Proxy a) typeEnv userPrompt
+      typeEnv <- setEnv env tools
+      seed <- unsafeInterpret "setContext" "Config -> Env -> IO ()"
+      liftIO $
+        seed
+          config {maxDepth = LLM.maxDepth config - 1}
+          env {resolvedTools = Just tools}
+      let ctx = buildContext requiredType typeEnv userPrompt
       code <- stripFence <$> liftIO (ask ctx)
       liftIO (logEvent lg (Request (LLM.systemPrompt config) ctx requiredType))
       liftIO (logEvent lg (Response code))
       runAttempt lg ask code 0
     case result of
       Left interpErr -> error (show interpErr)
-      Right f -> pure (f config env)
+      Right v -> pure v
   where
-    baseModules = ["Prelude", "LLM", "Agents", "Data.Typeable", "Language.Haskell.TH.Syntax"]
-    requiredType = show (typeRep (Proxy :: Proxy a))
+    -- Checked against the aliased spelling so only alias targets need scope.
+    requiredType = applyAliases (typeAliases env) (show (typeRep (Proxy :: Proxy a)))
 
-    runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
+    runAttempt :: Log -> (String -> IO String) -> String -> Int -> Interpreter a
     runAttempt lg ask code attempt = do
-      result <- try (interpret (wrapper code) (as :: Config -> Env -> a))
+      result <- try (unsafeInterpret code requiredType)
       case result of
-        Right f -> do
+        Right v -> do
           liftIO (logEvent lg Success)
-          pure f
-        Left err -> handleFailure lg ask (formatErr err) attempt
+          pure v
+        Left err -> handleFailure lg ask (applyAliases (typeAliases env) (formatErr err)) attempt
 
-    handleFailure :: Log -> (String -> IO String) -> String -> Int -> Interpreter (Config -> Env -> a)
+    handleFailure :: Log -> (String -> IO String) -> String -> Int -> Interpreter a
     handleFailure lg ask errStr attempt
       | attempt < LLM.maxAttempts config - 1 = do
           liftIO (logEvent lg (Retry errStr))
@@ -97,14 +189,3 @@ mkAgent config env userPrompt = unsafePerformIO $
       | otherwise = do
           liftIO (logEvent lg (Failure errStr))
           error errStr
-
-    -- Trailing \n: the LLM emission is appended verbatim; without it, multi-line
-    -- code starts on our prefix line and breaks Haskell's offside rule.
-    -- Decrementing maxDepth on each recursive call caps total nesting.
-    wrapper =
-      (++)
-        "\\config env -> \
-        \let subagent :: Typeable a => String -> String -> a; \
-        \    subagent task input = mkAgent config{maxDepth = maxDepth config - 1} env \
-        \      (task ++ \"\\n<input>\\n\" ++ input ++ \"\\n</input>\") \
-        \in\n"

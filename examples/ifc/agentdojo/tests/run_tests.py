@@ -1,24 +1,10 @@
-"""Driver for the slack IFC tests and reference programs.
+"""Runs the insecure and secure slack reference programs against agentdojo's slack suite over the JSONL bridge.
 
-Two flavors of test, run through the same JSONL bridge protocol against
-agentdojo's slack environment:
-
-  IFC tests (slack-tests binary): each test name maps to one DC
-    computation. Pass/fail is decided by the test binary itself; the
-    driver just relays.
-
-  Reference tests (agentdojo-slack-reference binary): one hand-coded
-    `IO String` program per user_task. Pass/fail is decided by calling
-    agentdojo's per-task `utility(...)` / `utility_from_traces(...)`
-    against the env state mutated by the bridge round-trip.
-
-Environments come from agentdojo (`get_suite(...).load_and_inject_default_environment({})`);
-they are never hand-written here.
+A run passes when agentdojo's utility check succeeds or a secure run ends blocked by IFC.
 
 Usage:
     python run_tests.py                            # run all tests
-    python run_tests.py pass-simple-send ...       # run named tests
-    python run_tests.py ref-user_task_5            # filter to a reference
+    python run_tests.py ref-user_task_5            # run named tests
 """
 
 from __future__ import annotations
@@ -140,26 +126,10 @@ def _run_one(spec: TestSpec, runtime: FunctionsRuntime, env: Any) -> tuple[bool,
             proc.kill()
 
 
-def _make_reference_assess(task: Any) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
+def _make_assess(task: Any, secure: bool) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
+    # Blocked by IFC is an expected secure outcome.
     def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
-        if not ok:
-            return False, f"bridge error: {msg}"
-        try:
-            passed = task.utility(msg, pre, post)
-        except NotImplementedError:
-            passed = task.utility_from_traces(msg, pre, post, traces)
-        return bool(passed), "" if passed else "utility=False"
-
-    return assess
-
-
-def _make_secref_assess(task: Any) -> Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]:
-    """Secure-reference assessor: a 'blocked by IFC' done message counts as PASS
-    (the task's @expectedOutcome@ is @ExpectLabelError@ and the Haskell main
-    converted the raised LabelError into a successful 'blocked by IFC' done).
-    Otherwise behave like the standard reference assessor."""
-    def assess(ok: bool, msg: str, pre: Any, post: Any, traces: list[FunctionCall]) -> tuple[bool, str]:
-        if ok and msg == "blocked by IFC":
+        if secure and ok and msg == "blocked by IFC":
             return True, "blocked by IFC (expected)"
         if not ok:
             return False, f"bridge error: {msg}"
@@ -172,38 +142,14 @@ def _make_secref_assess(task: Any) -> Callable[[bool, str, Any, Any, list[Functi
     return assess
 
 
-def _build_reference_specs(suite: Any) -> list[TestSpec]:
-    specs = []
-    for i in range(NUM_USER_TASKS):
-        tid = f"user_task_{i}"
-        task = suite.user_tasks[tid]
-        specs.append(
-            TestSpec(
-                label=f"ref-{tid}",
-                exe_target="agentdojo-slack-reference",
-                argv=["--task", tid],
-                prompt=task.PROMPT,
-                assess=_make_reference_assess(task),
-            )
-        )
-    return specs
-
-
-def _build_secure_reference_specs(suite: Any) -> list[TestSpec]:
-    specs = []
-    for i in range(NUM_USER_TASKS):
-        tid = f"user_task_{i}"
-        task = suite.user_tasks[tid]
-        specs.append(
-            TestSpec(
-                label=f"secref-{tid}",
-                exe_target="agentdojo-slack-secure-reference",
-                argv=["--task", tid],
-                prompt=task.PROMPT,
-                assess=_make_secref_assess(task),
-            )
-        )
-    return specs
+def _build_specs(suite: Any, prefix: str, target: str, secure: bool) -> list[TestSpec]:
+    return [
+        TestSpec(label=f"{prefix}-user_task_{i}", exe_target=target,
+                 argv=["--task", f"user_task_{i}"],
+                 prompt=suite.user_tasks[f"user_task_{i}"].PROMPT,
+                 assess=_make_assess(suite.user_tasks[f"user_task_{i}"], secure))
+        for i in range(NUM_USER_TASKS)
+    ]
 
 
 def main() -> int:
@@ -214,8 +160,8 @@ def main() -> int:
 
     suite = get_suite(args.benchmark_version, DEFAULT_SUITE)
     all_specs = (
-        _build_reference_specs(suite)
-        + _build_secure_reference_specs(suite)
+        _build_specs(suite, "ref", "agentdojo-slack-reference", secure=False)
+        + _build_specs(suite, "secref", "agentdojo-slack-secure-reference", secure=True)
     )
     by_label = {s.label: s for s in all_specs}
 

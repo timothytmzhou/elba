@@ -16,7 +16,7 @@ import Data.List
     (\\),
   )
 import Data.Ord (Down (..), comparing)
-import IFC (DC, evalLIO, initialState, toLabeled, unlabel)
+import IFC (DC, runDC, toLabeled, unlabel)
 import Slack
 import System.Environment (getArgs)
 import Web
@@ -351,7 +351,7 @@ main = do
         Nothing -> error "missing --task <user_task_N> flag"
   withBridge $ do
     _ <- readPrompt
-    result <- try (evalLIO (dispatch taskId) initialState) :: IO (Either SomeException ())
+    result <- try (runDC (dispatch taskId)) :: IO (Either SomeException ())
     case result of
       Right () -> sendDone "done"
       Left e

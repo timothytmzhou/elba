@@ -11,21 +11,22 @@ extra-source-files:
 library
   exposed-modules:
     Agents
+    Docs
     Env
     LLM
     Log
-    TH
 
   hs-source-dirs:  .
   default-language: GHC2024
   build-depends:
-    mtl ^>=2.3.1,
     aeson,
     base >= 4.20 && < 5,
     bytestring,
     containers,
     exceptions,
     filepath,
+    ghc,
+    ghc-paths,
     hint,
     mtl,
     process,

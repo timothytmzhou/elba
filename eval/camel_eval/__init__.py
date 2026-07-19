@@ -1,0 +1,37 @@
+"""The checkout at <repo>/camel is a pristine clone of camel-prompt-injection."""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parents[1]
+CHECKOUT = REPO_ROOT / "camel"
+
+REPO_URL = "https://github.com/google-research/camel-prompt-injection.git"
+
+
+def ensure_checkout() -> Path:
+    if not CHECKOUT.exists():
+        print(f"[camel] cloning into {CHECKOUT}", flush=True)
+        subprocess.run(["git", "clone", REPO_URL, str(CHECKOUT)], check=True)
+    if subprocess.run(["git", "diff", "--quiet"], cwd=CHECKOUT).returncode:
+        sys.exit("the camel checkout has local changes, it must stay pristine")
+    env_file = CHECKOUT / ".env"
+    if not env_file.exists():
+        env_file.write_text("")
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        if key not in env_file.read_text() and os.environ.get(key):
+            with env_file.open("a") as f:
+                f.write(f'\n{key}="{os.environ[key]}"\n')
+    return CHECKOUT
+
+
+def worker_cmd(worker_args: list[str]) -> list[str]:
+    uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
+    return [uv, "run", "--project", str(CHECKOUT), "--env-file", str(CHECKOUT / ".env"),
+            "python", str(HERE.parent / "run.py"), *worker_args]

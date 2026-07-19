@@ -1,15 +1,22 @@
 [project]
-name = "agentdojo-haskell-bridge"
-version = "0.1.0"
-description = "Python side of the typed-agents <-> AgentDojo slack-suite bridge"
+name = "typed-agents-eval"
+version = "0.2.0"
+description = "AgentDojo evaluation harness for typed agents and the CaMeL baseline"
 requires-python = ">=3.11"
 dependencies = [
-    "agentdojo>=0.1.30",
+    "agentdojo>=0.1.35",
+    "scipy>=1.11",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["haskell_agent", "run_eval"]
+py-modules = ["experiment", "bridge", "runner", "process"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
