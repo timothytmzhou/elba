@@ -19,4 +19,4 @@ Policies on tools check that the current integrity can perform the required acti
 
 In general, information flows should be as isolated as possible, so that the code will not be rejected. You must make sure that the current label is not raised above the clearance, otherwise the action will be rejected. Every unlabel should be as limited in scope as possible via `toLabeled`.
 
-Before you begin, identify what information flows are NECESSARY for the task. Write your code so that every other flow is isolated (via `toLabeled`). For example, if you need to apply an operation independently to all elements of a list, unlabel each one inside a `toLabeled`.
+Before you begin, identify what information flows are NECESSARY for the task. Write your code so that every other flow is isolated (via an appropriate `toLabeled` block). For example, if you need to apply an operation independently to all elements of a list, unlabel each one inside a `toLabeled`. Always quarantine subagents with `toLabeled`.
