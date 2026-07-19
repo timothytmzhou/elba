@@ -1,6 +1,7 @@
 import os
 
 import boto3
+import botocore.config
 import llm
 import openai
 from aws_bedrock_token_generator import provide_token
@@ -14,7 +15,10 @@ class ConverseModel(BedrockModel):
         reasoning_effort: str | None = None
 
     def execute(self, prompt, stream, response, conversation):
-        bedrock = boto3.Session().client("bedrock-runtime", region_name=AWS_REGION)
+        # long reasoning responses outlive the default 60s read timeout
+        timeouts = botocore.config.Config(read_timeout=1800, connect_timeout=10)
+        bedrock = boto3.Session().client("bedrock-runtime", region_name=AWS_REGION,
+                                         config=timeouts)
         messages = []
         system = prompt.system
         for turn in conversation.responses if conversation else []:
