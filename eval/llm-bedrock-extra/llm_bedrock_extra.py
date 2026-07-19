@@ -1,9 +1,38 @@
 import os
 
+import boto3
 import llm
 import openai
 from aws_bedrock_token_generator import provide_token
 from llm_bedrock import AWS_REGION, BedrockModel
+
+
+# The stock model plus reasoning effort, which Claude takes as adaptive
+# thinking with an output_config effort level.
+class ConverseModel(BedrockModel):
+    class Options(llm.Options):
+        reasoning_effort: str | None = None
+
+    def execute(self, prompt, stream, response, conversation):
+        bedrock = boto3.Session().client("bedrock-runtime", region_name=AWS_REGION)
+        messages = []
+        system = prompt.system
+        for turn in conversation.responses if conversation else []:
+            system = system or turn.prompt.system
+            messages.append({"role": "user", "content": [{"text": turn.prompt.prompt}]})
+            messages.append({"role": "assistant", "content": [{"text": turn.text_or_raise()}]})
+        messages.append({"role": "user", "content": [{"text": prompt.prompt}]})
+        params = {"messages": messages, "modelId": self.model_id}
+        if system:
+            params["system"] = [{"text": system}]
+        if prompt.options.reasoning_effort:
+            params["additionalModelRequestFields"] = {
+                "thinking": {"type": "adaptive"},
+                "output_config": {"effort": prompt.options.reasoning_effort}}
+        result = bedrock.converse(**params)
+        yield result["output"]["message"]["content"][-1]["text"]
+        usage = result["usage"]
+        response.set_usage(input=usage["inputTokens"], output=usage["outputTokens"])
 
 
 # OpenAI models on Bedrock are served only by the OpenAI compatible
@@ -50,4 +79,4 @@ def register_models(register):
         if model_id.startswith("openai."):
             register(MantleModel(model_id))
         else:
-            register(BedrockModel(model_id, True))
+            register(ConverseModel(model_id, True))

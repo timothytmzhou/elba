@@ -4,7 +4,7 @@ One command runs TypeGuard and CaMeL, with/without IFC policies, benign and unde
 ```bash
 python eval/run.py --models eval/configs/*.json
 ```
-Prints the run plan, confirms (`--yes` to skip), runs everything in parallel, resumes from a result-file cache.
+Prints the run plan, confirms (`--no-confirm` to skip), runs everything in parallel, resumes from a result-file cache.
 
 ## Outputs (`<logdir>/results/`)
 - `dump.jsonl` — raw per-task records (verdicts, duration, tokens, transcript paths)
