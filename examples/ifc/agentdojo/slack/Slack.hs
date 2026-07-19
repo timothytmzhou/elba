@@ -94,10 +94,10 @@ removeUserFromSlack (SL.UserID user) = do
   Policy.assertIntegrity cFalse
   ioTCB (SlackTCB.removeUserFromSlack user)
 
--- | Send a DM with @labeledBody@ to @recipient@. Requires @recipient@ integrity.
+-- | Send a DM with @labeledBody@ to @recipient@. Requires AnyUser integrity.
 sendDirectMessage :: UserID -> DCLabeled Body -> DC ()
-sendDirectMessage recipient@(SL.UserID name) labeledBody = do
-  l <- SL.labelFor (SL.ForUser recipient)
+sendDirectMessage (SL.UserID name) labeledBody = do
+  l <- SL.labelFor SL.AnyUser
   Policy.write (SlackTCB.sendDirectMessage name) l labeledBody
 
 -- | Post @labeledBody@ to @channel@. Requires @channel@ integrity.
