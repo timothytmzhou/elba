@@ -61,8 +61,16 @@ main = do
         defEnv
           { modules = if secure then secureMods else insecureMods
           , extensions = [OverloadedStrings]
-          , -- The alias keeps the required type spelled DC where TypeRep would expand the synonym.
-            typeAliases = [("LIO DCLabel", "DC") | secure]
+          , -- The aliases keep types spelled the way the agent imports them.
+            typeAliases =
+              if secure
+                then
+                  [ ("LIO DCLabel", "DC")
+                  , ("LIO.Label.Label", "Label")
+                  , ("LIO.TCB.LIO", "LIO")
+                  , ("LIO.TCB.Labeled", "Labeled")
+                  ]
+                else []
           }
   loaded <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
   let base = loaded {logPath = parseFlag "--log-path" args}
