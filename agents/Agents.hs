@@ -49,7 +49,7 @@ setEnv env tools = do
     [ModuleImport m NotQualified NoImportList | m <- modules env ++ baseModules]
       ++ [ModuleImport m (QualifiedAs Nothing) NoImportList | m <- qualifiedModules]
   let values = [t | t <- tools, toolIsValue t]
-  sigs <- mapM (typeOf . parenIfOp . toolName) values
+  sigs <- map (applyAliases (typeAliases env)) <$> mapM (typeOf . parenIfOp . toolName) values
   pure (TypeEnv (Map.fromList [(toolName t, (sig, toolDoc t)) | (t, sig) <- zip values sigs]))
 
 -- | In scope unqualified, so emitted code can call subagent.

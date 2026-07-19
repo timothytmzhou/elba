@@ -13,7 +13,7 @@ import Policy (DCLabeled, assertWrite, write)
 import WebTCB (Url)
 import WebTCB qualified
 
--- | Fetch @url@ exposing current to the web and reading public content.
+-- | Fetch @url@. The content is labeled with secrecy public and with integrity public.
 getWebpage :: Url -> DC (DCLabeled String)
 getWebpage url = do
   assertWrite dcPublic
