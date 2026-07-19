@@ -211,7 +211,8 @@ def main() -> int:
                     help="run models with a bedrock_model id through Bedrock")
     ap.add_argument("--plan-only", action="store_true")
     ap.add_argument("--process-only", action="store_true")
-    ap.add_argument("--yes", "-y", action="store_true")
+    ap.add_argument("--no-confirm", "-y", action="store_true",
+                    help="skip the run confirmation prompt")
     ap.add_argument("--no-build", action="store_true",
                     help="skip cabal build before locating binaries")
     args = ap.parse_args()
@@ -234,9 +235,9 @@ def main() -> int:
         if args.plan_only:
             return 0
         if to_run:
-            if not args.yes:
+            if not args.no_confirm:
                 if not sys.stdin.isatty():
-                    print("stdin is not a TTY; pass --yes to run non-interactively")
+                    print("stdin is not a TTY; pass --no-confirm to run non-interactively")
                     return 1
                 if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
                     return 1

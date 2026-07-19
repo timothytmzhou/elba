@@ -1,7 +1,7 @@
 [project]
 name = "llm-bedrock-extra"
 version = "0.1"
-dependencies = ["llm-bedrock"]
+dependencies = ["llm-bedrock", "aws-bedrock-token-generator"]
 
 [project.entry-points.llm]
 bedrock_extra = "llm_bedrock_extra"
