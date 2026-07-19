@@ -2,23 +2,26 @@
 
 Your expression is inside the `DC` monad, a monad for enforcing information flow control (IFC) policies dynamically. This monad is implemented around three primary abstractions:
 
-- **labels** — data has a label describing both integrity (where it came from) and secrecy (who can read it)
-- **the current label** — the current label of the computation, representing an aggregate of all the data read
-- **clearance** — a bound on the secrecy of the current label
+- **labels** — data has a label recording its author. Labeled data is inert: holding it or passing it along changes nothing until it is read.
+- **privilege** — the computation runs at some privilege, which starts full and only ever lowers. Reading data lowers our privilege to match what the author of the data can do (to avoid having the data make us take a restricted action).
+- **scopes** — code runs in a scope. Lowering privilege inside a scope does not affect the privilege outside it.
 
 IFC primitives you can use:
 
-- **`unlabel`** — given labeled data, taints the current label's secrecy and integrity. We can think of this as lowering our privilege to match what the author of the data can do (to avoid having the data make us take a restricted action). Importantly, the current clearance is also lowered to match the integrity of the data.
-- **`toLabeled`** — given a `DC a`, spawns a separate scope where the action is run using the current label and clearance. This will not taint the current label; however, the result will be labeled.
+- **`unlabel`** — reads labeled data into the scope, lowering the scope's privilege to that of the data's author. Only unlabeling lowers privilege; holding or passing along labeled data does not.
+- **`toLabeled`** — given a `DC a`, runs it in a new scope starting at the current privilege. Privilege lowered inside stays inside. The result comes back labeled, and inspecting it requires an `unlabel`, which lowers privilege by everything the scope read.
 
 # Policies on Tools
 
-Policies on tools check that the current integrity can perform the required action. Some tools which make writes take in labeled data, to avoid needing to unlabel the data first.
+Every tool requires privilege for its action. Many tools return and accept labeled data, so passing data to a tool does not require unlabeling it.
 
 # Writing Compliant Code
 
-In general, information flows should be as isolated as possible, so that the code will not be rejected. You must make sure that the current label is not raised above the clearance, otherwise the action will be rejected. Every unlabel should be as limited in scope as possible via `toLabeled`.
+Write a program that accomplishes the task by making tool calls.
 
-Ordering matters. Clearance only ever decreases, so taint acquired early can make a later `unlabel` fail even inside a `toLabeled` block, because the inner scope inherits the outer label. Run each isolated flow first, and read or look up as late as possible.
-
-Before you begin, identify what information flows are NECESSARY for the task. Write your code so that every other flow is isolated (via an appropriate `toLabeled` block). For example, if you need to apply an operation independently to all elements of a list, unlabel each one inside a `toLabeled`. Always quarantine subagents with `toLabeled`.
+1. Split the task into atomic subtasks, and identify the dependencies between the subtasks.
+2. Give each subtask its own `toLabeled` scope. Dependencies flow between scopes as labeled values, either returned by a tool call or produced as the result of a scope.
+3. Pass labeled values as is where possible, and unlabel only what a subtask must see.
+4. When unlabeled data decides an action, perform the action inside the scope that unlabeled the data, one scope per item; the scope's result then needs no unlabel.
+5. An `unlabel` lowers the privilege of the current scope, and a scope begins with whatever privilege the enclosing scope still has. In each scope, place the sub-scopes first, then the scope's own tool calls and `unlabel`s.
+6. Run subagents inside the scope of the subtask that owns their input.
