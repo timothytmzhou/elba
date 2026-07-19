@@ -9,7 +9,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class AgentConfig:
     modelName: str
-    systemPrompt: str = ""
+    systemPrompt: str = ""  # appended to the built in prompt
     maxAttempts: int = 3
     maxDepth: int = 10
     seed: int | None = None

@@ -43,10 +43,12 @@ parseFlag flag (a : v : _) | a == flag = Just v
 parseFlag flag (_ : rest) = parseFlag flag rest
 parseFlag _ [] = Nothing
 
+-- The systemPrompt in a config file is an addendum to the built in prompt.
 loadConfig :: FilePath -> IO Config
 loadConfig path = do
   bs <- BL.readFile path
-  either (\err -> error ("config decode failed: " ++ err)) pure (eitherDecode bs)
+  cfg <- either (\err -> error ("config decode failed: " ++ err)) pure (eitherDecode bs)
+  pure cfg {systemPrompt = defaultSystemPrompt ++ systemPrompt cfg}
 
 main :: IO ()
 main = do
@@ -65,7 +67,7 @@ main = do
   loaded <- maybe (pure defaultConfig) loadConfig (parseFlag "--config" args)
   let base = loaded {logPath = parseFlag "--log-path" args}
       cfg
-        | secure = base {systemPrompt = defaultSystemPrompt ++ "\n" ++ ifcGuidance}
+        | secure = base {systemPrompt = systemPrompt base ++ "\n" ++ ifcGuidance}
         | otherwise = base
   withBridge $ do
     prompt <- readPrompt
