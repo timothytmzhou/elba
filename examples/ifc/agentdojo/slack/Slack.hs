@@ -46,6 +46,7 @@ getChannels = do
   pure [SL.ChannelID name | name <- names, viewable name]
 
 -- | Read the messages from @channel@.
+-- Bodies are labeled with secrecy channel and with integrity sender.
 readChannelMessages :: ChannelID -> DC [LabeledMessage]
 readChannelMessages channel@(SL.ChannelID name) = do
   cnf <- SL.cnfFor
@@ -60,6 +61,7 @@ readChannelMessages channel@(SL.ChannelID name) = do
   pure (map labelMessage messages)
 
 -- | Read @user@'s inbox.
+-- The result is labeled with secrecy @user@ and with integrity @user@.
 readInbox :: UserID -> DC (DCLabeled [Body])
 readInbox user@(SL.UserID name) = do
   l <- SL.labelFor (SL.ForUser user)
@@ -72,33 +74,33 @@ getUsersInChannel (SL.ChannelID name) = do
   users <- ioTCB (SlackTCB.getUsersInChannel name)
   pure (map SL.UserID users)
 
--- | Add @user@ to @channel@.
+-- | Add @user@ to @channel@. Requires @channel@ integrity.
 addUserToChannel :: UserID -> ChannelID -> DC ()
 addUserToChannel (SL.UserID user) channel@(SL.ChannelID name) = do
   cnf <- SL.cnfFor
   Policy.assertIntegrity (cnf (SL.ForChannel channel))
   ioTCB (SlackTCB.addUserToChannel user name)
 
--- | Invite @user@ at @user_email@.
+-- | Invite @user@ at @user_email@. Requires AnyUser integrity.
 inviteUserToSlack :: String -> String -> DC ()
 inviteUserToSlack user email = do
   cnf <- SL.cnfFor
   Policy.assertIntegrity (cnf SL.AnyUser)
   ioTCB (SlackTCB.inviteUserToSlack user email)
 
--- | Remove @user@.
+-- | Remove @user@. Requires full integrity.
 removeUserFromSlack :: UserID -> DC ()
 removeUserFromSlack (SL.UserID user) = do
   Policy.assertIntegrity cFalse
   ioTCB (SlackTCB.removeUserFromSlack user)
 
--- | Send a DM with @labeledBody@ to @recipient@.
+-- | Send a DM with @labeledBody@ to @recipient@. Requires @recipient@ integrity.
 sendDirectMessage :: UserID -> DCLabeled Body -> DC ()
 sendDirectMessage recipient@(SL.UserID name) labeledBody = do
   l <- SL.labelFor (SL.ForUser recipient)
   Policy.write (SlackTCB.sendDirectMessage name) l labeledBody
 
--- | Post @labeledBody@ to @channel@.
+-- | Post @labeledBody@ to @channel@. Requires @channel@ integrity.
 sendChannelMessage :: ChannelID -> DCLabeled Body -> DC ()
 sendChannelMessage channel@(SL.ChannelID name) labeledBody = do
   l <- SL.labelFor (SL.ForChannel channel)

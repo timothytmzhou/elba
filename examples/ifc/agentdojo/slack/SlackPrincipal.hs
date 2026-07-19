@@ -25,13 +25,13 @@ import SlackLabelTCB
     membership,
   )
 
--- | Get a labeled channel name with secrecy channel and integrity channel.
+-- | Get a channel name labeled with secrecy channel and with integrity channel.
 channelName :: ChannelID -> DC (DCLabeled String)
 channelName cid@(ChannelID c) = do
   l <- labelFor (ForChannel cid)
   pure (LabeledTCB l c)
 
--- | Get a labeled user name with secrecy AnyUser and integrity user.
+-- | Get a user name labeled with secrecy AnyUser and with integrity user.
 userName :: UserID -> DC (DCLabeled String)
 userName uid@(UserID u) = do
   cnf <- cnfFor
