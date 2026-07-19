@@ -1,0 +1,8 @@
+llm_bedrock_extra.py
+pyproject.toml
+llm_bedrock_extra.egg-info/PKG-INFO
+llm_bedrock_extra.egg-info/SOURCES.txt
+llm_bedrock_extra.egg-info/dependency_links.txt
+llm_bedrock_extra.egg-info/entry_points.txt
+llm_bedrock_extra.egg-info/requires.txt
+llm_bedrock_extra.egg-info/top_level.txt

@@ -1,0 +1,7 @@
+[project]
+name = "llm-bedrock-extra"
+version = "0.1"
+dependencies = ["llm-bedrock"]
+
+[project.entry-points.llm]
+bedrock_extra = "llm_bedrock_extra"

@@ -1,0 +1,2 @@
+[llm]
+bedrock_extra = llm_bedrock_extra
