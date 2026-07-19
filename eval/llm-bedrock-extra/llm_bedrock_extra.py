@@ -20,9 +20,13 @@ class ConverseModel(BedrockModel):
         for turn in conversation.responses if conversation else []:
             system = system or turn.prompt.system
             messages.append({"role": "user", "content": [{"text": turn.prompt.prompt}]})
-            messages.append({"role": "assistant", "content": [{"text": turn.text_or_raise()}]})
+            # Converse rejects empty text blocks
+            text = turn.text_or_raise() or "(no output)"
+            messages.append({"role": "assistant", "content": [{"text": text}]})
         messages.append({"role": "user", "content": [{"text": prompt.prompt}]})
-        params = {"messages": messages, "modelId": self.model_id}
+        # the default 4096 cap gets fully consumed by thinking
+        params = {"messages": messages, "modelId": self.model_id,
+                  "inferenceConfig": {"maxTokens": 100000}}
         if system:
             params["system"] = [{"text": system}]
         if prompt.options.reasoning_effort:
@@ -30,7 +34,9 @@ class ConverseModel(BedrockModel):
                 "thinking": {"type": "adaptive"},
                 "output_config": {"effort": prompt.options.reasoning_effort}}
         result = bedrock.converse(**params)
-        yield result["output"]["message"]["content"][-1]["text"]
+        # reasoning responses interleave reasoningContent blocks with text
+        blocks = result["output"]["message"]["content"]
+        yield "".join(b["text"] for b in blocks if "text" in b)
         usage = result["usage"]
         response.set_usage(input=usage["inputTokens"], output=usage["outputTokens"])
 
