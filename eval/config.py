@@ -20,15 +20,27 @@ class AgentConfig:
 @dataclass(frozen=True)
 class Model:
     name: str
+    provider: str
     agent_config: AgentConfig
     camel_model: str | None = None  # None means typeguard only
     bedrock_model: str | None = None  # the Bedrock id, taken under --bedrock
 
 
+# The providers upstream CaMeL implements.
+CAMEL_PROVIDERS = {"openai", "anthropic", "google"}
+
+
+# The model field is provider:id, the pydantic ai format.
 def load_model(path: str | Path) -> Model:
     raw = json.loads(Path(path).read_text())
-    extra = {k: raw.pop(k, None) for k in ("camel_model", "bedrock_model")}
-    return Model(name=Path(path).stem, agent_config=AgentConfig(**raw), **extra)
+    provider, _, model_id = raw.pop("model").partition(":")
+    if not model_id:
+        raise ValueError(f"model must look like provider:id in {path}")
+    bedrock_model = raw.pop("bedrock_model", None)
+    return Model(name=Path(path).stem, provider=provider,
+                 agent_config=AgentConfig(modelName=model_id, **raw),
+                 camel_model=f"{provider}:{model_id}" if provider in CAMEL_PROVIDERS else None,
+                 bedrock_model=bedrock_model)
 
 
 # Models without a bedrock_model keep their API keys.
@@ -40,12 +52,7 @@ def on_bedrock(m: Model) -> Model:
 
 
 def attack_persona(m: Model) -> str:
-    name = m.agent_config.modelName.lower()
-    if "claude" in name or "anthropic" in name:
-        return "Claude"
-    if "gpt" in name or "openai" in name:
-        return "ChatGPT"
-    return "AI assistant"
+    return {"anthropic": "Claude", "openai": "ChatGPT"}.get(m.provider, "AI assistant")
 
 
 def display(m: Model) -> str:

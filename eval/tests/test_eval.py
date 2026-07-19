@@ -13,7 +13,7 @@ sys.path.insert(0, str(EVAL_DIR))
 
 from benchmark import (  # noqa: E402
     Benchmark, REPO_ROOT, expand, pipeline_name, result_path, slug, split_cached)
-from config import AgentConfig, Model, on_bedrock  # noqa: E402
+from config import AgentConfig, Model, load_model, on_bedrock  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
@@ -23,16 +23,19 @@ from process import newcombe_paired_diff, process, suite_table  # noqa: E402
 def model(name="gpt-5.4-high", llm_command=None) -> Model:
     return Model(
         name=name,
+        provider="openai",
         agent_config=AgentConfig(modelName="gpt-5.4", reasoningEffort="high", seed=0,
                                  llmCommand=llm_command),
-        camel_model="openai:gpt-5.4-2026-03-05",
+        camel_model="openai:gpt-5.4",
     )
 
 
 def configs_for(m: Model, tmp_path: Path) -> dict[str, str]:
     # Workers load their model from a config file.
+    cfg = asdict(m.agent_config)
+    cfg["model"] = f"{m.provider}:{cfg.pop('modelName')}"
     path = tmp_path / f"{m.name}.json"
-    path.write_text(json.dumps({**asdict(m.agent_config), "camel_model": m.camel_model}))
+    path.write_text(json.dumps(cfg))
     return {m.name: str(path)}
 
 
@@ -65,6 +68,16 @@ def test_split_cached(tmp_path):
     p.write_text(json.dumps({"utility": True, "security": True}))
     to_run, cached = split_cached([a1, a2], tmp_path)
     assert cached == [a1] and to_run == [a2]
+
+
+def test_load_model(tmp_path):
+    p = tmp_path / "opus-4.7-high.json"
+    p.write_text(json.dumps({"model": "anthropic:claude-opus-4-7", "seed": 1}))
+    m = load_model(p)
+    assert m.provider == "anthropic" and m.camel_model == "anthropic:claude-opus-4-7"
+    assert m.agent_config.modelName == "claude-opus-4-7" and m.agent_config.seed == 1
+    p.write_text(json.dumps({"model": "mistral:mistral-large"}))
+    assert load_model(p).camel_model is None  # unknown to camel, typeguard only
 
 
 def test_on_bedrock():

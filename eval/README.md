@@ -40,9 +40,9 @@ Per-task budget is 10 minutes; a timeout scores as failure.
 ## Adding a model
 Drop a JSON into `configs/`:
 ```json
-{ "modelName": "gpt-5.4", "reasoningEffort": "high", "seed": 0, "camel_model": "openai:gpt-5.4-2026-03-05" }
+{ "model": "openai:gpt-5.4", "reasoningEffort": "high", "seed": 0 }
 ```
-One `AgentConfig` plus `camel_model`, named by its filename. No `camel_model` means TypeGuard only. Model names are their direct API form, run with provider API keys. `--bedrock` moves every model with a `bedrock_model` id onto Bedrock instead (an `llm` plugin on the TypeGuard side), authenticating through the AWS chain (EC2 instance role plus `AWS_REGION`); models without one keep their API keys. OpenAI models on Bedrock use its OpenAI compatible endpoint, which needs `AWS_BEARER_TOKEN_BEDROCK`.
+`model` is `provider:api-id` (the pydantic-ai format): the id goes to the `llm` CLI and the full string to CaMeL, so use an id both accept (`llm` can register new ones via `extra-openai-models.yaml`). Providers CaMeL lacks run TypeGuard only. By default everything runs on provider API keys; adding a `bedrock_model` profile id lets `--bedrock` move that model onto Bedrock instead (an `llm` plugin on the TypeGuard side), authenticating through the AWS chain (EC2 instance role plus `AWS_REGION`). OpenAI models on Bedrock use its OpenAI compatible endpoint, which needs `AWS_BEARER_TOKEN_BEDROCK`.
 
 ## Prerequisites
 GHC/cabal to build the binary; the `llm` CLI with provider credentials; `uv` for CaMeL.
