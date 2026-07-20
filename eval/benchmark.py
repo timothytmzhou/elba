@@ -19,7 +19,9 @@ REPO_ROOT = EVAL_DIR.parent
 BENIGN = "none"
 SUITES = ("slack",)
 ATTACKS = ("direct", "important_instructions")
-BENCHMARK_VERSION = "v1.2.2"
+# v1.2.1 is the newest the CaMeL baseline's agentdojo supports; the slack
+# suite is byte-identical to v1.2.2, so both systems compare on the same tasks.
+BENCHMARK_VERSION = "v1.2.1"
 TASK_TIMEOUT_S = 600
 
 TYPEGUARD_POLICY_SUITES = {"slack"}
