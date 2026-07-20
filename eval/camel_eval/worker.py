@@ -26,6 +26,8 @@ def _use_bedrock(bedrock_model: str) -> None:
     class BedrockAnthropicLLM(anthropic_base):
         def __init__(self, client, model, **kwargs):
             super().__init__(anthropic.AsyncAnthropicBedrock(), bedrock_model, **kwargs)
+            # Claude 4.7+ reject the temperature parameter, None omits it
+            self.temperature = None
 
     class BedrockOpenAILLM(openai_base):
         def __init__(self, client, model, *args, **kwargs):
