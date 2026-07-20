@@ -12,3 +12,4 @@ logs/
 camel/
 .notes/
 *.egg-info/
+data/
