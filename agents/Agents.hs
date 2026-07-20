@@ -141,7 +141,7 @@ setContext config env = writeIORef contextRef (config, env)
 subagent :: (Typeable a) => String -> String -> a
 subagent task input = unsafePerformIO $ do
   (config, env) <- readIORef contextRef
-  pure (mkAgent config env (task ++ "\n<input>\n" ++ input ++ "\n</input>"))
+  pure (mkAgent config env ("You are a subagent. " ++ task ++ "\n\nYour input was:\n<input>\n" ++ input ++ "\n</input>"))
 
 mkAgent :: forall a. (Typeable a) => Config -> Env -> String -> a
 mkAgent config _ _
