@@ -50,7 +50,7 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         None,  # thinking_budget_tokens
         bench.suite,
         None,  # ad_defense
-        MetadataEvalMode.NORMAL,
+        MetadataEvalMode.STRICT,
         None,  # q_llm
     )
     if replay:
