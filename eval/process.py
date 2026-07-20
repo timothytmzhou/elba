@@ -20,7 +20,8 @@ SYSTEM_LABELS = {
     ("camel", "nopolicy"): "CaMeL (no policy)",
 }
 ROW_ORDER = list(SYSTEM_LABELS)
-ATTACK_LABELS = {"direct": "Direct", "important_instructions": r"Imp.\ Instr."}
+ATTACK_LABELS = {"direct": "Direct", "important_instructions": r"Imp.\ Instr.",
+                 "tool_knowledge": r"Tool Instr."}
 
 
 def _wilson(successes: int, trials: int) -> tuple[float, float]:

@@ -18,7 +18,7 @@ REPO_ROOT = EVAL_DIR.parent
 
 BENIGN = "none"
 SUITES = ("slack",)
-ATTACKS = ("direct", "important_instructions")
+ATTACKS = ("direct", "important_instructions", "tool_knowledge")
 # v1.2.1 is the newest the CaMeL baseline's agentdojo supports; the slack
 # suite is byte-identical to v1.2.2, so both systems compare on the same tasks.
 BENCHMARK_VERSION = "v1.2.1"
