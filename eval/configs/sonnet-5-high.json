@@ -1,0 +1,5 @@
+{
+  "model": "anthropic:claude-sonnet-5",
+  "reasoningEffort": "high",
+  "bedrock_model": "us.anthropic.claude-sonnet-5"
+}
