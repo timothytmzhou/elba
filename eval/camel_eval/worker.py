@@ -3,6 +3,10 @@ import os
 import tempfile
 from pathlib import Path
 
+# Fully initialize agentdojo before camel reaches into its suite submodules,
+# otherwise camel's deep banking import hits a circular import.
+import agentdojo.task_suite.load_suites  # noqa: F401
+
 import anthropic
 import openai
 import camel.models
