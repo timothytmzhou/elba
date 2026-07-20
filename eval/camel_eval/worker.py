@@ -1,4 +1,5 @@
 # The policy variant replays the recording the nopolicy variant wrote.
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -64,7 +65,18 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         tmp = tempfile.mkdtemp()
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
-    run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+        try:
+            run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+        except Exception as e:
+            # The recorded nopolicy run was incomplete, e.g. it timed out, so
+            # score the cell as a failure rather than leaving it missing.
+            dst = result_path(bench, logdir)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(json.dumps({"utility": False, "security": True,
+                                       "error": f"replay of incomplete recording: {e}"}))
+            return
+    else:
+        run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
 
     # CaMeL writes under its own pipeline name, copy the result to ours.
     src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id
