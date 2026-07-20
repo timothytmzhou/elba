@@ -57,7 +57,8 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         None,  # thinking_budget_tokens
         bench.suite,
         None,  # ad_defense
-        MetadataEvalMode.STRICT,
+        MetadataEvalMode.NORMAL if os.environ.get("CAMEL_EVAL_MODE") == "NORMAL"
+        else MetadataEvalMode.STRICT,
         None,  # q_llm
     )
     if replay:
