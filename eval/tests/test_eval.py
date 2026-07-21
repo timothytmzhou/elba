@@ -17,7 +17,7 @@ from config import AgentConfig, Model, load_model, on_bedrock  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
-from process import newcombe_paired_diff, process, suite_table  # noqa: E402
+from process import newcombe_paired_diff, process, utility_table  # noqa: E402
 
 
 def model(name="gpt-5.4-high", llm_command=None) -> Model:
@@ -210,25 +210,30 @@ def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     assert report.timeout == 1
 
 
-def test_suite_table_full_matrix(tmp_path):
-    m = model()
-    models = {m.name: m}
-    attacks = ["direct", "important_instructions"]
-    records = []
+def test_utility_table_full_matrix(tmp_path):
+    import pandas as pd
+    from process import SYSTEM_LABELS
     from benchmark import suite_tasks
+    attacks = ["direct", "important_instructions"]
     user_tasks, injection_tasks = suite_tasks("slack")
+    rows = []
     for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
-            records.append((Benchmark(system, variant, m.name, 1, "slack", ut),
-                            Result(utility=True, security=True)))
+            rows.append({"System": SYSTEM_LABELS[(system, variant)], "Model": "Gpt 5.4",
+                         "system": system, "variant": variant, "suite": "slack", "task": ut,
+                         "attack": "none", "injection": "none", "rep": 1,
+                         "utility": 1, "security": 1})
             for attack in attacks:
                 for it in injection_tasks:
-                    records.append((Benchmark(system, variant, m.name, 1, "slack", ut, attack, it),
-                                    Result(utility=True, security=(variant == "nopolicy"))))
-    tex = suite_table(records, "slack", models, attacks, repeats=1)
-    # All four system rows including the no policy under attack cells.
+                    rows.append({"System": SYSTEM_LABELS[(system, variant)], "Model": "Gpt 5.4",
+                                 "system": system, "variant": variant, "suite": "slack", "task": ut,
+                                 "attack": attack, "injection": it, "rep": 1,
+                                 "utility": 1, "security": int(variant == "nopolicy")})
+    df = pd.DataFrame(rows)
+    tex = utility_table(df, "slack")
+    # All four system rows including the attacked utility cells.
     for label in ["TypeGuard", "TypeGuard (no policy)", "CaMeL", "CaMeL (no policy)"]:
         assert label in tex
-    assert r"105/105 (100.0\%)" in tex
-    assert " & 0/105 " in tex
+    assert "21/21" in tex
+    assert "105/105" in tex
