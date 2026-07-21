@@ -17,7 +17,7 @@ _upstream = camel.models._is_oai_reasoning_model
 camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
-def _use_bedrock(bedrock_model: str) -> None:
+def _use_bedrock(bedrock_model: str, effort: str) -> None:
     # Swaps Bedrock clients in under the upstream provider paths, keeping the full model id upstream would truncate.
     os.environ.setdefault("ANTHROPIC_API_KEY", "unused-on-bedrock")
     os.environ.setdefault("OPENAI_API_KEY", "unused-on-bedrock")
@@ -29,6 +29,18 @@ def _use_bedrock(bedrock_model: str) -> None:
             super().__init__(anthropic.AsyncAnthropicBedrock(), bedrock_model, **kwargs)
             # Claude 4.7+ reject the temperature parameter, None omits it
             self.temperature = None
+            # Opus 4.7 and 4.8 only think when adaptive is set explicitly
+            # budget_tokens is rejected so effort rides in output_config
+            stream = self.client.messages.stream
+
+            def adaptive_stream(**kw):
+                kw["thinking"] = {"type": "adaptive"}
+                kw["max_tokens"] = max(kw.get("max_tokens") or 0, 32000)
+                kw["extra_body"] = {**(kw.get("extra_body") or {}),
+                                    "output_config": {"effort": effort}}
+                return stream(**kw)
+
+            self.client.messages.stream = adaptive_stream
 
     class BedrockOpenAILLM(openai_base):
         def __init__(self, client, model, *args, **kwargs):
@@ -46,7 +58,7 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
     from run import run_agentdojo_task
 
     if bedrock and model.bedrock_model:
-        _use_bedrock(model.bedrock_model)
+        _use_bedrock(model.bedrock_model, model.agent_config.reasoningEffort or "high")
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
         model.camel_model,
