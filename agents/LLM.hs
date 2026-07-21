@@ -30,6 +30,9 @@ data Config = Config
   --   on each recursive call; mkAgent refuses to call the LLM at depth <= 0.
   , llmCommand      :: Maybe FilePath
   -- ^ The llm CLI to invoke. Nothing means llm on PATH.
+  , evalAdversarially :: Maybe Bool
+  -- ^ Just True lets a detected injection command replace the subagent prompt.
+  --   Off by default and used only by the adversarial security eval.
   }
 
 -- The default system prompt body lives in SystemPrompt.md so it can be
@@ -56,6 +59,7 @@ defaultConfig = Config
   , maxAttempts     = 3
   , maxDepth        = 10
   , llmCommand      = Nothing
+  , evalAdversarially = Nothing
   }
 
 toArgs :: Config -> [String]

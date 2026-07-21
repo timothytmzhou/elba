@@ -15,6 +15,7 @@ class AgentConfig:
     seed: int | None = None
     reasoningEffort: str | None = None
     llmCommand: str | None = None
+    evalAdversarially: bool = False
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,7 @@ import sqlite3
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from tqdm import tqdm
@@ -67,13 +67,19 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
 
 def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str,
                        pipeline) -> None:
-    from agentdojo.attacks.attack_registry import load_attack
+    from agentdojo.attacks.attack_registry import load_attack, register_attack
+    from agentdojo.attacks.baseline_attacks import DirectAttack
     from agentdojo.benchmark import (
         TaskResults, run_task_with_injection_tasks, run_task_without_injection_tasks)
     from agentdojo.functions_runtime import FunctionCall  # noqa: F401
     from agentdojo.logging import OutputLogger
     from agentdojo.models import MODEL_NAMES
     from agentdojo.task_suite.load_suites import get_suite
+
+    # Direct TODO injection under a name that selects the compromised subagent eval
+    class AdversarialAttack(DirectAttack):
+        name = "adversarial"
+    register_attack(AdversarialAttack)
 
     TaskResults.model_rebuild()
     rep_dir = logdir / f"rep{bench.rep}"
@@ -101,7 +107,10 @@ def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
     private = logdir / f"rep{bench.rep}" / pipeline_name(bench) / ".agent" / slug(bench)
     private.mkdir(parents=True, exist_ok=True)
     config = private / "config.json"
-    config.write_text(json.dumps(asdict(model.agent_config)))
+    agent_config = model.agent_config
+    if bench.attack == "adversarial":
+        agent_config = replace(agent_config, evalAdversarially=True)
+    config.write_text(json.dumps(asdict(agent_config)))
     cmd = [typeguard_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
     pipeline = HaskellAgentPipeline(cmd, pipeline_name(bench), str(config),
                                     str(private / "transcript.jsonl"), private / "llm")
@@ -204,6 +213,8 @@ def main() -> int:
                     help="comma list. empty runs only the benign baseline")
     ap.add_argument("--systems", default="typeguard,camel")
     ap.add_argument("--repeats", type=int, default=1, help="repetitions per task")
+    ap.add_argument("--no-benign", action="store_true",
+                    help="skip the benign baseline, e.g. the adversarial table has no Safe column")
     ap.add_argument("--max-workers", type=int, default=None,
                     help="parallel workers. default ceil(n/4)")
     ap.add_argument("--timeout", type=int, default=TASK_TIMEOUT_S,
@@ -231,6 +242,8 @@ def main() -> int:
 
     if not args.process_only:
         benchmarks = expand(list(models.values()), suites, attacks, args.repeats, systems)
+        if args.no_benign:
+            benchmarks = [b for b in benchmarks if not is_benign(b)]
         to_run, cached = split_cached(benchmarks, logdir)
         max_workers = args.max_workers or min(max(math.ceil(len(to_run) / 4), 1), 512)
         print_plan(to_run, cached, max_workers)
