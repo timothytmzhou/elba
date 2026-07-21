@@ -91,7 +91,16 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
                                        "error": f"replay of incomplete recording: {e}"}))
             return
     else:
-        run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+        try:
+            run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+        except Exception as e:
+            # A crash such as the API rejecting an empty text block is scored a
+            # failure rather than left as a missing cell
+            dst = result_path(bench, logdir)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(json.dumps({"utility": False, "security": False,
+                                       "error": f"agent crashed: {e}"}))
+            return
 
     # CaMeL writes under its own pipeline name, copy the result to ours.
     src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id
