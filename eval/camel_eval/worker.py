@@ -8,8 +8,6 @@ from pathlib import Path
 # otherwise camel's deep banking import hits a circular import.
 import agentdojo.task_suite.load_suites  # noqa: F401
 
-import anthropic
-import openai
 import camel.models
 from camel.interpreter.interpreter import MetadataEvalMode
 
@@ -17,48 +15,13 @@ _upstream = camel.models._is_oai_reasoning_model
 camel.models._is_oai_reasoning_model = lambda m: "gpt-5" in m or _upstream(m)
 
 
-def _use_bedrock(bedrock_model: str, effort: str) -> None:
-    # Swaps Bedrock clients in under the upstream provider paths, keeping the full model id upstream would truncate.
-    os.environ.setdefault("ANTHROPIC_API_KEY", "unused-on-bedrock")
-    os.environ.setdefault("OPENAI_API_KEY", "unused-on-bedrock")
-    anthropic_base = camel.models.agent_pipeline.AnthropicLLM
-    openai_base = camel.models.agent_pipeline.OpenAILLM
-
-    class BedrockAnthropicLLM(anthropic_base):
-        def __init__(self, client, model, **kwargs):
-            super().__init__(anthropic.AsyncAnthropicBedrock(), bedrock_model, **kwargs)
-            # Claude 4.7+ reject the temperature parameter, None omits it
-            self.temperature = None
-            # Opus 4.7 and 4.8 only think when adaptive is set explicitly
-            # budget_tokens is rejected so effort rides in output_config
-            stream = self.client.messages.stream
-
-            def adaptive_stream(**kw):
-                kw["thinking"] = {"type": "adaptive"}
-                kw["max_tokens"] = max(kw.get("max_tokens") or 0, 32000)
-                kw["extra_body"] = {**(kw.get("extra_body") or {}),
-                                    "output_config": {"effort": effort}}
-                return stream(**kw)
-
-            self.client.messages.stream = adaptive_stream
-
-    class BedrockOpenAILLM(openai_base):
-        def __init__(self, client, model, *args, **kwargs):
-            client = openai.OpenAI(
-                base_url=f"https://bedrock-runtime.{os.environ['AWS_REGION']}.amazonaws.com/openai/v1",
-                api_key=os.environ["AWS_BEARER_TOKEN_BEDROCK"])
-            super().__init__(client, bedrock_model, *args, **kwargs)
-
-    camel.models.agent_pipeline.AnthropicLLM = BedrockAnthropicLLM
-    camel.models.agent_pipeline.OpenAILLM = BedrockOpenAILLM
-
-
 def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
     from benchmark import result_path
+    from camel_eval.bedrock import use_bedrock
     from run import run_agentdojo_task
 
     if bedrock and model.bedrock_model:
-        _use_bedrock(model.bedrock_model, model.agent_config.reasoningEffort or "high")
+        use_bedrock(model.bedrock_model, model.agent_config.reasoningEffort or "high")
     replay = bench.variant == "policy"
     pipeline = camel.models.make_tools_pipeline(
         model.camel_model,
@@ -81,10 +44,6 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         try:
             run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
         except Exception as e:
-            # The recorded nopolicy run was incomplete, e.g. it timed out, so
-            # score the cell as a failure rather than leaving it missing.
-            # security False means the attack was resisted, a pass, since an
-            # agent that never converged never performed the injection.
             dst = result_path(bench, logdir)
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(json.dumps({"utility": False, "security": False,
@@ -94,8 +53,6 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         try:
             run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
         except Exception as e:
-            # A crash such as the API rejecting an empty text block is scored a
-            # failure rather than left as a missing cell
             dst = result_path(bench, logdir)
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(json.dumps({"utility": False, "security": False,
