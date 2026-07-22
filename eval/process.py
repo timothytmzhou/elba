@@ -172,7 +172,7 @@ def ci_table(df: pd.DataFrame, suites: list[str], models: dict[str, Model]) -> s
     return "% Requires \\usepackage{booktabs}\n" + body
 
 
-def process(logdir, models, suites, attacks, repeats) -> Path:
+def process(logdir, models, suites) -> Path:
     df = load_frame(logdir, models)
     outdir = logdir / "results"
     outdir.mkdir(parents=True, exist_ok=True)

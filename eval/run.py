@@ -177,12 +177,9 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
     def run_task(bench: Benchmark) -> Outcome:
         cmd = _worker_cmd(bench, configs[bench.model], logdir, benchmark_version, bedrock)
         outcome = run_with_timeout(cmd, logdir / ".workers" / f"{slug(bench)}.log", timeout_s)
-        match outcome:
-            case Outcome.TIMEOUT:
-                _record_timeout(bench, logdir, timeout_s)
-                tqdm.write(f"TIMEOUT: {slug(bench)}")
-            case Outcome.COMPLETED:
-                pass
+        if outcome is Outcome.TIMEOUT:
+            _record_timeout(bench, logdir, timeout_s)
+            tqdm.write(f"TIMEOUT: {slug(bench)}")
         return outcome
 
     # The policy replay runs as a second wave over the recordings of the first.
@@ -264,7 +261,7 @@ def main() -> int:
 
     from process import process
 
-    process(logdir, models, suites, attacks, args.repeats)
+    process(logdir, models, suites)
     return 0
 
 

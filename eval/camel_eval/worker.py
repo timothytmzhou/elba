@@ -41,23 +41,15 @@ def run_camel(bench, model, logdir, benchmark_version, bedrock=False):
         tmp = tempfile.mkdtemp()
         os.symlink(os.path.join(str(logdir), f"rep{bench.rep}"), os.path.join(tmp, "logs"))
         os.chdir(tmp)
-        try:
-            run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
-        except Exception as e:
-            dst = result_path(bench, logdir)
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(json.dumps({"utility": False, "security": False,
-                                       "error": f"replay of incomplete recording: {e}"}))
-            return
-    else:
-        try:
-            run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
-        except Exception as e:
-            dst = result_path(bench, logdir)
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(json.dumps({"utility": False, "security": False,
-                                       "error": f"agent crashed: {e}"}))
-            return
+    try:
+        run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
+    except Exception as e:
+        reason = "replay of incomplete recording" if replay else "agent crashed"
+        dst = result_path(bench, logdir)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(json.dumps({"utility": False, "security": False,
+                                   "error": f"{reason}: {e}"}))
+        return
 
     # CaMeL writes under its own pipeline name, copy the result to ours.
     src = (Path(logdir) / f"rep{bench.rep}" / pipeline.name / bench.suite / bench.task_id

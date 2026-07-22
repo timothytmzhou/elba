@@ -164,18 +164,18 @@ def test_worker_end_to_end(slack_run):
 
 def test_processing_outputs(slack_run):
     models, logdir, _ = slack_run
-    outdir = process(logdir, models, ["slack"], ["important_instructions"], repeats=1)
+    outdir = process(logdir, models, ["slack"])
     dump = [json.loads(l) for l in (outdir / "dump.jsonl").read_text().splitlines()]
     assert len(dump) == 2
-    rec = next(r for r in dump if r["benchmark"]["attack"] == "none")
-    assert rec["result"]["utility"] is True and rec["result"]["final_output"] == "I read the page."
-    assert rec["result"]["duration_s"] is not None
+    benign = next(r for r in dump if r["attack"] == "none")
+    assert benign["System"] == "TypeGuard" and benign["utility"] == 1
 
-    tex = (outdir / "table_slack.tex").read_text()
+    tex = (outdir / "utility_slack.tex").read_text()
     assert r"\begin{table}" in tex and r"\toprule" in tex
     assert "TypeGuard" in tex
-    assert r"1/1 (100.0\%)" in tex
-    assert " & 1/1 " in tex
+    assert "1/1" in tex
+    assert (outdir / "security_slack.tex").exists()
+    assert (outdir / "confidence_intervals.tex").exists()
 
 
 def test_subagent_recursion(tmp_path, agent_exe, mock_llm):

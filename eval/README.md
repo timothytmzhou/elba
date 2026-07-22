@@ -7,7 +7,7 @@ python eval/run.py --models eval/configs/*.json
 Prints the run plan, confirms (`--no-confirm` to skip), runs everything in parallel, resumes from a result-file cache.
 
 ## Outputs (`<logdir>/results/`)
-- `dump.jsonl` — raw per-task records (verdicts, duration, tokens, transcript paths)
+- `dump.jsonl` — one line per task evaluation: system, model, task, attack, and the utility/security verdicts (durations, tokens, and transcript paths stay in the per-task result JSONs under `<logdir>`)
 - `utility_<suite>.tex`, `security_<suite>.tex`, `adversarial_<suite>.tex` — paste-ready paper tables
 - `confidence_intervals.tex` — TypeGuard − CaMeL paired-difference 95% CIs (Newcombe)
 
