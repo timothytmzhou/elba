@@ -1,0 +1,31 @@
+% Requires \usepackage{booktabs}
+\begin{table}
+\caption{95\% confidence intervals for the difference in task completion rates (TypeGuard $-$ CaMeL), using Newcombe's score interval for paired proportions.}
+\label{tab:agentdojo-cis}
+\begin{tabular}{lllr}
+\toprule
+Suite & Model & Setting & 95\% CI (pp) \\
+\midrule
+slack & Opus 4.7 & No attack, no policies & $[-8.4, +35.9]$ \\
+slack & Opus 4.7 & No attack, with policies & $[+2.9, +41.8]$ \\
+slack & Opus 4.7 & Direct attack & $[+17.3, +35.3]$ \\
+slack & Opus 4.7 & Imp.\ Instr. attack & $[+17.4, +35.3]$ \\
+slack & Opus 4.7 & Tool Instr. attack & $[+17.4, +35.3]$ \\
+slack & Opus 4.8 & No attack, no policies & $[-16.9, +16.9]$ \\
+slack & Opus 4.8 & No attack, with policies & $[-7.4, +34.1]$ \\
+slack & Opus 4.8 & Direct attack & $[+9.9, +25.8]$ \\
+slack & Opus 4.8 & Imp.\ Instr. attack & $[+8.7, +25.2]$ \\
+slack & Opus 4.8 & Tool Instr. attack & $[+6.3, +22.0]$ \\
+slack & Gpt 5.4 & No attack, no policies & $[-24.0, +14.5]$ \\
+slack & Gpt 5.4 & No attack, with policies & $[+2.9, +41.8]$ \\
+slack & Gpt 5.4 & Direct attack & $[+17.4, +35.3]$ \\
+slack & Gpt 5.4 & Imp.\ Instr. attack & $[+12.0, +29.4]$ \\
+slack & Gpt 5.4 & Tool Instr. attack & $[+13.6, +31.5]$ \\
+slack & Sonnet 5 & No attack, no policies & $[-22.7, +31.3]$ \\
+slack & Sonnet 5 & No attack, with policies & $[-4.7, +40.4]$ \\
+slack & Sonnet 5 & Direct attack & $[+7.9, +26.0]$ \\
+slack & Sonnet 5 & Imp.\ Instr. attack & $[+12.4, +30.9]$ \\
+slack & Sonnet 5 & Tool Instr. attack & $[+7.9, +24.3]$ \\
+\bottomrule
+\end{tabular}
+\end{table}

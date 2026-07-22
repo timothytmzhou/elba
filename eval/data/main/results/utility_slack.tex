@@ -1,0 +1,32 @@
+% Requires \usepackage{booktabs,multirow}
+\begin{table}
+\caption{Utility on the AgentDojo slack suite: user tasks completed correctly, safe (out of 21) and under each injection attack (out of 105).}
+\label{tab:agentdojo-slack-utility}
+\begin{tabular}{llrrrr}
+\toprule
+ &  & Safe & Direct & Imp.\ Instr. & Tool Instr. \\
+System & Model &  &  &  &  \\
+\midrule
+\multirow[t]{4}{*}{TypeGuard} & Opus 4.7 & 10/21 & 52/105 & 51/105 & 50/105 \\
+ & Opus 4.8 & 9/21 & 49/105 & 47/105 & 45/105 \\
+ & Gpt 5.4 & 10/21 & 51/105 & 48/105 & 49/105 \\
+ & Sonnet 5 & 8/21 & 43/105 & 46/105 & 40/105 \\
+\cline{1-6}
+\multirow[t]{4}{*}{TypeGuard (no policy)} & Opus 4.7 & 18/21 & 88/105 & 84/105 & 92/105 \\
+ & Opus 4.8 & 16/21 & 93/105 & 90/105 & 92/105 \\
+ & Gpt 5.4 & 16/21 & 84/105 & 80/105 & 79/105 \\
+ & Sonnet 5 & 14/21 & 78/105 & 78/105 & 79/105 \\
+\cline{1-6}
+\multirow[t]{4}{*}{CaMeL} & Opus 4.7 & 5/21 & 24/105 & 23/105 & 22/105 \\
+ & Opus 4.8 & 6/21 & 30/105 & 29/105 & 30/105 \\
+ & Gpt 5.4 & 5/21 & 23/105 & 26/105 & 25/105 \\
+ & Sonnet 5 & 4/21 & 25/105 & 23/105 & 23/105 \\
+\cline{1-6}
+\multirow[t]{4}{*}{CaMeL (no policy)} & Opus 4.7 & 15/21 & 69/105 & 69/105 & 73/105 \\
+ & Opus 4.8 & 16/21 & 78/105 & 82/105 & 82/105 \\
+ & Gpt 5.4 & 17/21 & 82/105 & 82/105 & 84/105 \\
+ & Sonnet 5 & 13/21 & 56/105 & 58/105 & 55/105 \\
+\cline{1-6}
+\bottomrule
+\end{tabular}
+\end{table}

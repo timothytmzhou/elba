@@ -1,0 +1,51 @@
+Model versions — typing-agents AgentDojo eval
+=============================================
+Eval run date: 2026-07-21
+Serving platform (Claude): AWS Bedrock, region us-west-2, Messages API via AnthropicBedrock
+Access config: adaptive thinking (thinking={type:adaptive}), effort=high
+Serving platform (GPT): OpenAI API (not Bedrock)
+
+Note on Claude versioning: from the Claude 4.6 generation onward, model IDs are
+dateless but each ID is a PINNED SNAPSHOT, not an evergreen pointer (per Anthropic
+docs, models overview). The model ID is the version. Bedrock exposes no separate
+dated snapshot for these models (foundation-model lifecycle = ACTIVE, no date field).
+
+Claude Opus 4.8
+  served on Bedrock:   us.anthropic.claude-opus-4-8  ->  anthropic.claude-opus-4-8  (pinned snapshot, ACTIVE)
+  Claude API ID:       claude-opus-4-8
+  config file:         eval/configs/opus-4.8-high.json  (model "anthropic:claude-opus-4-8", effort high)
+  knowledge cutoff:    Jan 2026
+
+Claude Opus 4.7
+  served on Bedrock:   us.anthropic.claude-opus-4-7  ->  anthropic.claude-opus-4-7  (pinned snapshot, ACTIVE)
+  Claude API ID:       claude-opus-4-7
+  config file:         eval/configs/opus-4.7-high.json  (model "anthropic:claude-opus-4-7-20260416")
+  note:                the config carries a dated string, but on Bedrock the served
+                       model is the dateless pinned snapshot above (on_bedrock swaps
+                       modelName for the bedrock_model id), so the served version is
+                       anthropic.claude-opus-4-7.
+  knowledge cutoff:    Jan 2026
+
+Claude Sonnet 5
+  served on Bedrock:   us.anthropic.claude-sonnet-5  ->  anthropic.claude-sonnet-5  (pinned snapshot, ACTIVE)
+  Claude API ID:       claude-sonnet-5
+  config file:         eval/configs/sonnet-5-high.json  (model "anthropic:claude-sonnet-5", effort high)
+  knowledge cutoff:    Jan 2026
+  status:              CaMeL re-run at 6 workers with the Bedrock empty-text fix, 336/336
+                       nopolicy + 336/336 policy, 0 empty-text crashes, 48 timeouts counted
+                       as failures. Low parallelism because the Bedrock TPM quota is 6M/min
+                       vs 30M for Opus and the quarantined LLM is also Sonnet 5, so each task
+                       drives the Sonnet quota twice.
+
+GPT-5.4
+  model id:            gpt-5.4
+  served snapshot:     gpt-5.4-2026-03-05  (the "gpt-5.4" alias resolves to this dated snapshot;
+                       confirmed via a live completion whose response model field was
+                       gpt-5.4-2026-03-05, and via the OpenAI models list)
+  snapshot created:    2026-03-05T06:24:12Z   (OpenAI models API "created" field, 1772691852)
+  config file:         eval/configs/gpt-5.4-high.json  (model "openai:gpt-5.4", effort high, seed 0)
+  access:              OpenAI API (NOT Bedrock; llm -m gpt-5.4 resolves to the OpenAI plugin,
+                       whereas the Bedrock GPT is registered separately as openai.gpt-5.4)
+  key:                 funded key (nadia_key.txt); the earlier openai_key.txt was
+                       unfunded (429 insufficient_quota) which caused the 0% GPT results.
+  status:              completed with the funded key.

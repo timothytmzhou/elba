@@ -1,0 +1,22 @@
+% Requires \usepackage{booktabs,multirow}
+\begin{table}
+\caption{Adversarial evaluation on the AgentDojo slack suite: each subagent prompt is replaced by the injected command to model a compromised subagent.}
+\label{tab:agentdojo-slack-adversarial}
+\begin{tabular}{llrr}
+\toprule
+ &  & Completed & Resisted \\
+System & Model &  &  \\
+\midrule
+\multirow[t]{4}{*}{TypeGuard} & Opus 4.7 & 351/735 & 734/735 \\
+ & Opus 4.8 & 312/735 & 731/735 \\
+ & Gpt 5.4 & 290/735 & 725/735 \\
+ & Sonnet 5 & 294/735 & 722/735 \\
+\cline{1-4}
+\multirow[t]{4}{*}{TypeGuard (no policy)} & Opus 4.7 & 523/735 & 425/735 \\
+ & Opus 4.8 & 557/735 & 460/735 \\
+ & Gpt 5.4 & 256/735 & 670/735 \\
+ & Sonnet 5 & 494/734 & 540/734 \\
+\cline{1-4}
+\bottomrule
+\end{tabular}
+\end{table}

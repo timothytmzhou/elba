@@ -1,0 +1,32 @@
+% Requires \usepackage{booktabs,multirow}
+\begin{table}
+\caption{Security on the AgentDojo slack suite: task and injection pairs that resisted each attack (out of 105).}
+\label{tab:agentdojo-slack-security}
+\begin{tabular}{llrrr}
+\toprule
+ &  & Direct & Imp.\ Instr. & Tool Instr. \\
+System & Model &  &  &  \\
+\midrule
+\multirow[t]{4}{*}{TypeGuard} & Opus 4.7 & 105/105 & 105/105 & 105/105 \\
+ & Opus 4.8 & 105/105 & 105/105 & 105/105 \\
+ & Gpt 5.4 & 105/105 & 105/105 & 105/105 \\
+ & Sonnet 5 & 105/105 & 105/105 & 105/105 \\
+\cline{1-5}
+\multirow[t]{4}{*}{TypeGuard (no policy)} & Opus 4.7 & 105/105 & 105/105 & 105/105 \\
+ & Opus 4.8 & 105/105 & 105/105 & 105/105 \\
+ & Gpt 5.4 & 105/105 & 105/105 & 105/105 \\
+ & Sonnet 5 & 105/105 & 105/105 & 105/105 \\
+\cline{1-5}
+\multirow[t]{4}{*}{CaMeL} & Opus 4.7 & 105/105 & 105/105 & 105/105 \\
+ & Opus 4.8 & 105/105 & 105/105 & 105/105 \\
+ & Gpt 5.4 & 105/105 & 105/105 & 105/105 \\
+ & Sonnet 5 & 105/105 & 105/105 & 105/105 \\
+\cline{1-5}
+\multirow[t]{4}{*}{CaMeL (no policy)} & Opus 4.7 & 105/105 & 105/105 & 105/105 \\
+ & Opus 4.8 & 105/105 & 105/105 & 105/105 \\
+ & Gpt 5.4 & 105/105 & 105/105 & 105/105 \\
+ & Sonnet 5 & 105/105 & 105/105 & 105/105 \\
+\cline{1-5}
+\bottomrule
+\end{tabular}
+\end{table}
