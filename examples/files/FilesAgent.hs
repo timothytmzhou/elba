@@ -1,8 +1,8 @@
 module Main where
 
-import Agents (mkAgent)
 import Control.Exception (try)
 import Env (defEnv, modules)
+import LBAC (mkAgent)
 import LLM (defaultConfig)
 import RIO
 import System.Directory (createDirectoryIfMissing)

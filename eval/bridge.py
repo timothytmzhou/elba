@@ -69,7 +69,7 @@ class HaskellAgentPipeline:
                     raise RuntimeError(f"agent closed stdout early (exit {proc.poll()})")
                 msg = json.loads(line)
                 if "call" not in msg:
-                    answer = msg.get("done") or msg.get("failed")
+                    answer = msg["done"] if "done" in msg else msg.get("failed")
                     break
                 args = msg.get("args") or {}
                 tool_calls.append(FunctionCall(function=msg["call"], args=args))

@@ -1,5 +1,5 @@
 packages:
-  agents/
+  core/
   examples/files/
   examples/linear/
   examples/ifc/

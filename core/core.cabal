@@ -1,5 +1,5 @@
 cabal-version: 3.0
-name:          agents
+name:          core
 version:       0.1.0.0
 synopsis:      Agent primitive for typed agents
 license:       MIT
@@ -10,9 +10,9 @@ extra-source-files:
 
 library
   exposed-modules:
-    Agents
     Docs
     Env
+    LBAC
     LLM
     Log
 
@@ -40,7 +40,7 @@ test-suite test-llm
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    agents
+    core
 
 test-suite test-agent
   type:            exitcode-stdio-1.0
@@ -49,4 +49,4 @@ test-suite test-agent
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    agents
+    core

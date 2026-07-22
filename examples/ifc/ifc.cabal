@@ -30,7 +30,7 @@ library
   ghc-options:      -haddock
   build-depends:
     aeson,
-    agents,
+    core,
     base >= 4.20 && < 5,
     bytestring,
     containers,
@@ -43,7 +43,7 @@ executable agentdojo
   default-language: GHC2024
   build-depends:
     aeson,
-    agents,
+    core,
     base >= 4.20 && < 5,
     bytestring,
     filepath,

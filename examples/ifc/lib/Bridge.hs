@@ -12,6 +12,7 @@ module Bridge
   , sendDone
   , sendFailed
   , callPy
+  , parseFlag
   , ToolError (..)
   ) where
 
@@ -76,3 +77,9 @@ sendLine :: Value -> IO ()
 sendLine v = do
   BSL.hPut stdout (encode v <> "\n")
   hFlush stdout
+
+-- | The value following @flag@ in the argument list.
+parseFlag :: String -> [String] -> Maybe String
+parseFlag flag (a : v : _) | a == flag = Just v
+parseFlag flag (_ : rest) = parseFlag flag rest
+parseFlag _ [] = Nothing
