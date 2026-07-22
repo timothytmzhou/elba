@@ -1,6 +1,6 @@
 module Main where
 
-import Agents
+import LBAC
 import LLM
 import Env
 

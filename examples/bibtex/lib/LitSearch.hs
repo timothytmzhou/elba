@@ -3,24 +3,15 @@
 
 -- | DBLP-backed literature search sandbox.
 --
--- Provides:
---   * 'Trusted' — opaque provenance wrapper (constructor hidden)
---   * 'Bibtex'  — a BibTeX entry (just a String alias)
---   * 'TIO'     — restricted IO that only permits DBLP queries, bib-file writes, and logging
---
--- The key invariant: the only way to obtain a @Trusted Bibtex@ is via
--- 'dblpFetchBib', which downloads it from DBLP.  'writeBibFile' requires
--- @[Trusted Bibtex]@, so the agent cannot forge or tamper with entries.
+-- The only way to obtain a @Trusted Bibtex@ is 'dblpFetchBib', which downloads
+-- it from DBLP. 'writeBibFile' requires @[Trusted Bibtex]@, so the agent
+-- cannot forge or tamper with entries.
 module LitSearch
-  ( -- * Trusted (abstract)
-    Trusted        -- constructor hidden
+  ( Trusted
   , untrust
-    -- * Bibtex
   , Bibtex
-    -- * Search results
   , SearchResult(..)
-    -- * TIO: restricted IO for literature search
-  , TIO            -- constructor hidden
+  , TIO
   , runTIO
   , dblpSearch
   , dblpFetchBib
@@ -40,30 +31,15 @@ import System.Process (CreateProcess(..), StdStream(..), createProcess, proc, wa
 
 data Response = Step String | RespondToUser String
 
--- ---------------------------------------------------------------------------
--- Trusted wrapper (opaque)
--- ---------------------------------------------------------------------------
-
--- | An opaque wrapper attesting that the value was obtained from a trusted
--- source.  The constructor is NOT exported, so client code (including
--- LLM-generated code) cannot mint 'Trusted' values — only 'dblpFetchBib' can.
--- Destruction via 'untrust' is allowed.
+-- | Attests that the value came from a trusted source. The constructor is
+-- hidden, so only 'dblpFetchBib' can mint 'Trusted' values.
 newtype Trusted a = MkTrusted { untrust :: a }
   deriving (Show)
 
--- ---------------------------------------------------------------------------
--- Bibtex
--- ---------------------------------------------------------------------------
-
--- | A BibTeX entry (raw string).
+-- | A raw BibTeX entry.
 type Bibtex = String
 
--- ---------------------------------------------------------------------------
--- Search results
--- ---------------------------------------------------------------------------
-
--- | A single DBLP search hit, containing enough info for the agent to decide
--- whether to fetch the full BibTeX.
+-- | One DBLP search hit.
 data SearchResult = SearchResult
   { srKey     :: String
   , srTitle   :: String
@@ -71,22 +47,13 @@ data SearchResult = SearchResult
   , srYear    :: String
   } deriving (Show)
 
--- ---------------------------------------------------------------------------
--- TIO: restricted IO
--- ---------------------------------------------------------------------------
-
--- | Restricted IO for literature search.  The constructor is hidden; the only
--- permitted operations are 'dblpSearch', 'dblpFetchBib', 'writeBibFile', and
--- 'tioPutStrLn'.
+-- | Restricted IO for literature search. The constructor is hidden, so the
+-- exported operations are the only effects available.
 newtype TIO a = UnsafeTIO { runTIO :: IO a }
   deriving (Functor, Applicative, Monad)
 
--- ---------------------------------------------------------------------------
--- DBLP search
--- ---------------------------------------------------------------------------
-
 -- | Search DBLP for publications matching a query string.
--- Returns up to @h@ results (default 10).
+-- Returns at most 10 results.
 dblpSearch :: String -> TIO [SearchResult]
 dblpSearch query = UnsafeTIO $ do
   let url = "https://dblp.org/search/publ/api?format=json&h=10&q=" ++ escapeURIString query
@@ -96,35 +63,22 @@ dblpSearch query = UnsafeTIO $ do
     Right val -> return (parseSearchResults val)
 
 -- | Fetch the BibTeX entry for a search result from DBLP.
--- This is the ONLY way to obtain a @Trusted Bibtex@.
+-- The only way to obtain a @Trusted Bibtex@.
 dblpFetchBib :: SearchResult -> TIO (Trusted Bibtex)
 dblpFetchBib sr = UnsafeTIO $ do
   let url = "https://dblp.org/rec/" ++ srKey sr ++ ".bib"
   body <- curlBytes url
   return (MkTrusted (LBS.unpack body))
 
--- ---------------------------------------------------------------------------
--- Bib file output
--- ---------------------------------------------------------------------------
-
--- | Write a list of trusted BibTeX entries to a file.
--- Requires @[Trusted Bibtex]@ — the agent can reorder or filter the list,
--- but cannot forge entries.
+-- | Write trusted BibTeX entries to a file.
+-- The agent can reorder or filter the list but cannot forge entries.
 writeBibFile :: FilePath -> [Trusted Bibtex] -> TIO ()
 writeBibFile path entries = UnsafeTIO $
   writeFile path (concatMap untrust entries)
 
--- ---------------------------------------------------------------------------
--- Logging
--- ---------------------------------------------------------------------------
-
--- | Print a message to stdout (for agent logging / progress reporting).
+-- | Print a progress message to stdout.
 tioPutStrLn :: String -> TIO ()
 tioPutStrLn = UnsafeTIO . putStrLn
-
--- ---------------------------------------------------------------------------
--- Internal helpers
--- ---------------------------------------------------------------------------
 
 -- | Fetch a URL as raw bytes using curl, avoiding TLS FFI issues with hint.
 curlBytes :: String -> IO LBS2.ByteString
@@ -135,7 +89,6 @@ curlBytes url = do
   _ <- waitForProcess ph
   return body
 
--- | Minimal URI escaping: spaces → +, keep alphanumerics and a few safe chars.
 escapeURIString :: String -> String
 escapeURIString = concatMap esc
   where
@@ -153,7 +106,6 @@ escapeURIString = concatMap esc
       | n < 10    = toEnum (fromEnum '0' + n)
       | otherwise = toEnum (fromEnum 'A' + n - 10)
 
--- | Parse the DBLP JSON search response into a list of 'SearchResult'.
 parseSearchResults :: Value -> [SearchResult]
 parseSearchResults (Object top)
   | Just (Object result) <- KM.lookup "result" top

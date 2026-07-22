@@ -15,7 +15,7 @@ Build and run
 ```
 make run <target>
 ```
-e.g. `make run filesAgent`. The `build` step runs
+e.g. `make run files-agent`. The `build` step runs
 `cabal build --write-ghc-environment-files=always all`, which writes a
 `.ghc.environment.*` file at the repo root so `hint` can load the project's
 packages at runtime.

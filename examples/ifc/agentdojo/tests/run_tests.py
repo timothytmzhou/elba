@@ -23,6 +23,10 @@ from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
 from agentdojo.task_suite.load_suites import _SUITES, get_suite
 from packaging.version import Version
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "eval"))
+
+from bridge import to_jsonable  # noqa: E402
+
 DEFAULT_SUITE = "slack"
 NUM_USER_TASKS = 21
 
@@ -37,22 +41,12 @@ class TestSpec:
     assess: Callable[[bool, str, Any, Any, list[FunctionCall]], tuple[bool, str]]
 
 
-def _to_jsonable(obj: Any) -> Any:
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump()
-    if isinstance(obj, (list, tuple)):
-        return [_to_jsonable(x) for x in obj]
-    if isinstance(obj, dict):
-        return {k: _to_jsonable(v) for k, v in obj.items()}
-    return obj
-
-
 def _latest_benchmark_version() -> str:
     return max(_SUITES.keys(), key=lambda v: Version(v.lstrip("v")))
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[4]
 
 
 _exe_cache: dict[str, str] = {}
@@ -105,7 +99,7 @@ def _run_one(spec: TestSpec, runtime: FunctionsRuntime, env: Any) -> tuple[bool,
                 traces.append(FunctionCall(function=method, args=args))
                 result, error = runtime.run_function(env, method, args)
                 if error is None:
-                    proc.stdin.write(json.dumps({"ok": _to_jsonable(result)}) + "\n")
+                    proc.stdin.write(json.dumps({"ok": to_jsonable(result)}) + "\n")
                 else:
                     proc.stdin.write(json.dumps({"err": error}) + "\n")
                 proc.stdin.flush()

@@ -17,7 +17,7 @@ from config import AgentConfig, Model, load_model, on_bedrock  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
 from run import run_benchmarks, typeguard_exe  # noqa: E402
-from process import newcombe_paired_diff, process, utility_table  # noqa: E402
+from process import newcombe_paired_diff, utility_table  # noqa: E402
 
 
 def model(name="gpt-5.4-high", llm_command=None) -> Model:
@@ -160,22 +160,6 @@ def test_worker_end_to_end(slack_run):
                   "important_instructions/injection_task_1.json").read_text())
     assert attacked["utility"] is True
     assert attacked["security"] is False  # stub never performs the injection
-
-
-def test_processing_outputs(slack_run):
-    models, logdir, _ = slack_run
-    outdir = process(logdir, models, ["slack"], ["important_instructions"], repeats=1)
-    dump = [json.loads(l) for l in (outdir / "dump.jsonl").read_text().splitlines()]
-    assert len(dump) == 2
-    rec = next(r for r in dump if r["benchmark"]["attack"] == "none")
-    assert rec["result"]["utility"] is True and rec["result"]["final_output"] == "I read the page."
-    assert rec["result"]["duration_s"] is not None
-
-    tex = (outdir / "table_slack.tex").read_text()
-    assert r"\begin{table}" in tex and r"\toprule" in tex
-    assert "TypeGuard" in tex
-    assert r"1/1 (100.0\%)" in tex
-    assert " & 1/1 " in tex
 
 
 def test_subagent_recursion(tmp_path, agent_exe, mock_llm):

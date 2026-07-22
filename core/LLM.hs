@@ -35,10 +35,8 @@ data Config = Config
   --   Off by default and used only by the adversarial security eval.
   }
 
--- The default system prompt body lives in SystemPrompt.md so it can be
--- edited as prose. `addDependentFile` triggers a rebuild whenever that
--- file changes. Callers (e.g. MainSecure) can extend this string with
--- environment-specific addenda when constructing their own Config.
+-- The default system prompt lives in SystemPrompt.md so it can be edited
+-- as prose. `addDependentFile` triggers a rebuild whenever that file changes.
 defaultSystemPrompt :: String
 defaultSystemPrompt =
   $( do

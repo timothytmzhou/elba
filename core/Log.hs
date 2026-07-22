@@ -1,10 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Trustworthy #-}
 
--- Structured JSONL logging for the agent loop. One event per line; each
--- carries an ISO-8601 timestamp and a tagged payload. Used by Agents.hs to
--- record per-turn requests, responses, retries, and final outcomes without
--- printing to stderr.
+-- JSONL logging for the agent loop. One timestamped event per line.
 
 module Log
   ( Log
@@ -15,7 +12,7 @@ module Log
 
 import Data.Aeson (ToJSON (..), encode, object, (.=))
 import Data.ByteString.Lazy qualified as BSL
-import Data.Time.Clock (UTCTime, getCurrentTime)
+import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format.ISO8601 (iso8601Show)
 import System.IO (IOMode (AppendMode), withFile)
 
@@ -58,9 +55,6 @@ logEvent :: Log -> Event -> IO ()
 logEvent (Log Nothing) _ = pure ()
 logEvent (Log (Just path)) ev = do
   ts <- getCurrentTime
-  let entry = object ["ts" .= iso8601Time ts, "event" .= ev]
+  let entry = object ["ts" .= iso8601Show ts, "event" .= ev]
   withFile path AppendMode $ \h ->
     BSL.hPut h (encode entry <> "\n")
-
-iso8601Time :: UTCTime -> String
-iso8601Time = iso8601Show

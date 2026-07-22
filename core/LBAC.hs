@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 
-module Agents
+module LBAC
   ( Config
   , Env
   , mkAgent
@@ -54,9 +54,9 @@ setEnv env tools = do
 
 -- | In scope unqualified, so emitted code can call subagent.
 baseModules :: [ModuleName]
-baseModules = ["Prelude", "Agents"]
+baseModules = ["Prelude", "LBAC"]
 
--- | Ambient base vocabulary, qualified so name clashes are impossible.
+-- | Always importable by emitted code, qualified so name clashes are impossible.
 qualifiedModules :: [ModuleName]
 qualifiedModules =
   [ "Control.Applicative"
@@ -131,7 +131,7 @@ setupInterp env = do
 -- | Written through setContext because the interpreter keeps its own copy of this module.
 {-# NOINLINE contextRef #-}
 contextRef :: IORef (Config, Env)
-contextRef = unsafePerformIO (newIORef (error "Agents.subagent: no agent has run"))
+contextRef = unsafePerformIO (newIORef (error "LBAC.subagent: no agent has run"))
 
 -- | Writes contextRef in the interpreted copy of this module.
 setContext :: Config -> Env -> IO ()
@@ -163,7 +163,7 @@ findTodo s = case stripPrefix "TODO: " s of
 
 mkAgent :: forall a. (Typeable a) => Config -> Env -> String -> a
 mkAgent config _ _
-  | LLM.maxDepth config <= 0 = error "Agents.mkAgent: recursion depth exceeded"
+  | LLM.maxDepth config <= 0 = error "LBAC.mkAgent: recursion depth exceeded"
 mkAgent config env userPrompt = unsafePerformIO $
   withLog (logPath config) $ \lg -> do
     ask <- withSession config

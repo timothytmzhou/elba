@@ -2,9 +2,9 @@
 
 module Main where
 
-import Agents (mkAgent)
 import Control.Exception (SomeException, catch)
 import Env (Extension (LinearTypes), defEnv, extensions, modules)
+import LBAC (mkAgent)
 import LLM (defaultConfig)
 import Server
 

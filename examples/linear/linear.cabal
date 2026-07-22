@@ -17,5 +17,5 @@ executable buy-agent
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    agents,
+    core,
     linear

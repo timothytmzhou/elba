@@ -12,11 +12,11 @@ where
 
 data Cap = Cap
 
--- Defines allowable server options via an opaque type.
+-- Opaque, so the only obtainable requests are the exported operations.
 newtype ServerRequest a = ServerRequest (IO a)
   deriving (Functor, Applicative, Monad)
 
--- Requires and consumes capabability token.
+-- Consumes the capability token exactly once.
 newtype Auth a = Auth (Cap %1 -> ServerRequest a)
 
 runWithOneAuthorization :: Auth a -> IO a

@@ -19,7 +19,6 @@ module SlackTCB
   )
 where
 
-import Agents qualified as Slack
 import Bridge (callPy)
 import Data.Aeson (FromJSON, ToJSON, object, parseJSON, toJSON, withObject, (.:), (.=))
 import Data.Aeson qualified as A

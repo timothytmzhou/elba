@@ -5,8 +5,7 @@
 -- agentdojo --suite slack [--secure] [--config cfg.json] [--log-path log]
 module Main where
 
-import Agents (mkAgent)
-import Bridge (readPrompt, sendDone, sendFailed, withBridge)
+import Bridge (parseFlag, readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Data.Aeson (eitherDecode)
 import Data.Aeson.TH (defaultOptions, deriveFromJSON)
@@ -14,6 +13,7 @@ import Data.ByteString.Lazy qualified as BL
 import Data.Maybe (fromMaybe)
 import Env (Env (..), Extension (OverloadedStrings), defEnv)
 import IFC (DC, runDC)
+import LBAC (mkAgent)
 import LLM (Config (..), defaultConfig, defaultSystemPrompt)
 import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax qualified as TH
@@ -37,11 +37,6 @@ ifcGuidance =
       contents <- runIO (readFile path)
       TH.lift contents
    )
-
-parseFlag :: String -> [String] -> Maybe String
-parseFlag flag (a : v : _) | a == flag = Just v
-parseFlag flag (_ : rest) = parseFlag flag rest
-parseFlag _ [] = Nothing
 
 -- The systemPrompt in a config file is an addendum to the built in prompt.
 loadConfig :: FilePath -> IO Config

@@ -1,13 +1,11 @@
--- Hand-coded `IO String` reference programs for each AgentDojo slack
--- user_task. Each `refTaskN` derives its outputs from the actual
--- inputs read at runtime (webpage contents, channel/inbox messages),
--- making the information flow each task entails visible in source.
--- For human reading and as a verified-correct measuring stick for
--- what the LLM agent should be emitting -- never shown to any agent.
+-- Hand-coded reference programs for the AgentDojo slack user tasks.
+-- Each refTaskN derives its outputs from inputs read at runtime, so the
+-- information flow of each task is visible in source. These are the programs
+-- the LLM agent should be emitting. They are never shown to any agent.
 
 module Main where
 
-import Bridge (readPrompt, sendDone, sendFailed, withBridge)
+import Bridge (parseFlag, readPrompt, sendDone, sendFailed, withBridge)
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (filterM, zipWithM_)
 import Data.Char (isAlphaNum)
@@ -21,11 +19,13 @@ import Data.List
     nub,
     sort,
     sortBy,
+    stripPrefix,
     (\\),
   )
 import Data.Ord (Down (..), comparing)
 import SlackTCB
 import System.Environment (getArgs)
+import Text.Read (readMaybe)
 import WebTCB
 
 ----------------------------------------------------------------
@@ -287,39 +287,23 @@ refTask20 = refTask15 >> refTask16
 -- Dispatch / main.
 ----------------------------------------------------------------
 
-parseTaskId :: [String] -> Maybe String
-parseTaskId ("--task" : v : _) = Just v
-parseTaskId (_ : rest) = parseTaskId rest
-parseTaskId [] = Nothing
+refTasks :: [IO String]
+refTasks =
+  [ refTask0, refTask1, refTask2, refTask3, refTask4, refTask5, refTask6,
+    refTask7, refTask8, refTask9, refTask10, refTask11, refTask12, refTask13,
+    refTask14, refTask15, refTask16, refTask17, refTask18, refTask19, refTask20
+  ]
 
 dispatch :: String -> IO String
-dispatch "user_task_0" = refTask0
-dispatch "user_task_1" = refTask1
-dispatch "user_task_2" = refTask2
-dispatch "user_task_3" = refTask3
-dispatch "user_task_4" = refTask4
-dispatch "user_task_5" = refTask5
-dispatch "user_task_6" = refTask6
-dispatch "user_task_7" = refTask7
-dispatch "user_task_8" = refTask8
-dispatch "user_task_9" = refTask9
-dispatch "user_task_10" = refTask10
-dispatch "user_task_11" = refTask11
-dispatch "user_task_12" = refTask12
-dispatch "user_task_13" = refTask13
-dispatch "user_task_14" = refTask14
-dispatch "user_task_15" = refTask15
-dispatch "user_task_16" = refTask16
-dispatch "user_task_17" = refTask17
-dispatch "user_task_18" = refTask18
-dispatch "user_task_19" = refTask19
-dispatch "user_task_20" = refTask20
-dispatch other = error ("unknown task id: " ++ other)
+dispatch taskId =
+  case stripPrefix "user_task_" taskId >>= readMaybe of
+    Just n | n >= 0 && n < length refTasks -> refTasks !! n
+    _ -> error ("unknown task id: " ++ taskId)
 
 main :: IO ()
 main = do
   args <- getArgs
-  let taskId = case parseTaskId args of
+  let taskId = case parseFlag "--task" args of
         Just t -> t
         Nothing -> error "missing --task <user_task_N> flag"
   withBridge $ do
