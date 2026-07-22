@@ -22,7 +22,7 @@ packages at runtime.
 
 AgentDojo experiments
 ---------------------
-To run the experiments and produce the result tables (see
+Run the experiments and produce the result tables (see
 [eval/README.md](eval/README.md) for options):
 ```
 python eval/run.py --models eval/configs/*.json
