@@ -22,10 +22,8 @@ packages at runtime.
 
 AgentDojo experiments
 ---------------------
-One command runs the full evaluation (TypeGuard + CaMeL, all suites, benign
-and under attack) and emits the raw data dump plus the paper's LaTeX tables:
+To run the experiments and produce the result tables (see
+[eval/README.md](eval/README.md) for options):
 ```
 python eval/run.py --models eval/configs/*.json
 ```
-See [eval/README.md](eval/README.md) for outputs, options (`--suites`,
-`--attacks`, `--plan-only`, ...), and how to add models.
