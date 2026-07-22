@@ -13,11 +13,10 @@ Scored AgentDojo `slack` results for the Elba vs CaMeL comparison.
 `dump.jsonl` is the machine readable source the tables are built from. The worker
 stdout logs and the Elba agent transcripts are too large to include here.
 
-Re-derive the security verdicts from the recordings:
+Re-derive the security verdicts from the recordings (runs all four sweeps —
+CaMeL main, Elba main, and the Elba adversarial variants — over `--data`,
+which defaults to this directory):
 
 ```bash
-python eval/check_injections.py --recordings eval/data/main/camel-*
-python eval/check_injections.py --recordings eval/data/main/elba-*
-python eval/check_injections.py --recordings eval/data/adversarial/rep*/elba-nopolicy-*
-python eval/check_injections.py --recordings eval/data/adversarial/rep*/elba-policy-*
+python eval/check_injections.py
 ```
