@@ -56,7 +56,7 @@ setEnv env tools = do
 baseModules :: [ModuleName]
 baseModules = ["Prelude", "Agents"]
 
--- | Ambient base vocabulary, qualified so name clashes are impossible.
+-- | Always importable by emitted code, qualified so name clashes are impossible.
 qualifiedModules :: [ModuleName]
 qualifiedModules =
   [ "Control.Applicative"

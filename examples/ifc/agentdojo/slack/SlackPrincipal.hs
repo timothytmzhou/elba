@@ -37,7 +37,7 @@ userName uid@(UserID u) = do
   cnf <- cnfFor
   pure (LabeledTCB (cnf AnyUser %% cnf (ForUser uid)) u)
 
--- | Get a channelID from a name. 
+-- | Get a channelID from a name.
 -- Taints current secrecy with the channel label if the name exists.
 -- WARNING: if the channel does not exist, taints with maximum secrecy,
 -- as only the user should know what channels they cannot see.
@@ -46,8 +46,8 @@ channelID name = do
   groups <- membership
   if Map.member name groups
     then do
-      -- The user we are acting on behalf of NOT being in a channel is information secret to them.
-      -- This is safe ONLY because we ban labelOf, otherwise labelOf would like info.
+      -- Safe only because labelOf is banned; labelOf on the result would leak
+      -- whether the channel exists.
       taint (lookupCNF groups (ForChannel (ChannelID name)) %% cFalse)
       pure (Just (ChannelID name))
     else do

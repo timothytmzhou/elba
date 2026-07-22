@@ -37,8 +37,7 @@ newtype ToolError = ToolError String
 
 instance Exception ToolError
 
--- | Configure stdin/stdout for line-by-line JSON-RPC, then run the
--- action.
+-- | Configure stdin/stdout for line-delimited JSON, then run the action.
 withBridge :: IO a -> IO a
 withBridge action = do
   hSetBuffering stdin LineBuffering

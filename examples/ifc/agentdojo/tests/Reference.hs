@@ -1,9 +1,7 @@
--- Hand-coded `IO String` reference programs for each AgentDojo slack
--- user_task. Each `refTaskN` derives its outputs from the actual
--- inputs read at runtime (webpage contents, channel/inbox messages),
--- making the information flow each task entails visible in source.
--- For human reading and as a verified-correct measuring stick for
--- what the LLM agent should be emitting -- never shown to any agent.
+-- Hand-coded reference programs for the AgentDojo slack user tasks.
+-- Each refTaskN derives its outputs from inputs read at runtime, so the
+-- information flow of each task is visible in source. These are the programs
+-- the LLM agent should be emitting. They are never shown to any agent.
 
 module Main where
 
