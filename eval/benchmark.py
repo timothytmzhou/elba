@@ -24,7 +24,7 @@ ATTACKS = ("direct", "important_instructions", "tool_knowledge")
 BENCHMARK_VERSION = "v1.2.1"
 TASK_TIMEOUT_S = 600
 
-TYPEGUARD_POLICY_SUITES = {"slack"}
+ELBA_POLICY_SUITES = {"slack"}
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,7 @@ def suite_tasks(suite: str, benchmark_version: str = BENCHMARK_VERSION):
 
 
 def expand(models: list[Model], suites: list[str], attacks: list[str], repeats: int,
-           systems=("typeguard", "camel")) -> list[Benchmark]:
+           systems=("elba", "camel")) -> list[Benchmark]:
     benchmarks = []
     for suite in suites:
         user_tasks, injection_tasks = suite_tasks(suite)
@@ -73,8 +73,8 @@ def expand(models: list[Model], suites: list[str], attacks: list[str], repeats: 
             for system in systems:
                 if system == "camel" and not model.camel_model:
                     continue
-                variants = (["nopolicy"] if system == "typeguard"
-                            and suite not in TYPEGUARD_POLICY_SUITES else ["policy", "nopolicy"])
+                variants = (["nopolicy"] if system == "elba"
+                            and suite not in ELBA_POLICY_SUITES else ["policy", "nopolicy"])
                 for variant in variants:
                     for rep in range(1, repeats + 1):
                         base = dict(system=system, variant=variant, model=model.name,

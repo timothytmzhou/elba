@@ -8,7 +8,7 @@ at `<repo>/camel`, which is gitignored and must stay pristine.
     git clone https://github.com/google-research/camel-prompt-injection.git camel
 
 It is a `uv` project, so `import camel` resolves to `camel/src/camel` and the
-worker runs in the clone's own venv, separate from the TypeGuard venv:
+worker runs in the clone's own venv, separate from the Elba venv:
 
     uv run --project camel python eval/run.py worker ...
 
