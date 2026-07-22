@@ -24,9 +24,9 @@ from agentdojo.task_suite.load_suites import get_suite
 
 SWEEPS = [
     ("CaMeL main", "main/camel-*"),
-    ("TypeGuard main", "main/typeguard-*"),
-    ("TypeGuard adversarial (no policy)", "adversarial/rep*/typeguard-nopolicy-*"),
-    ("TypeGuard adversarial (policy)", "adversarial/rep*/typeguard-policy-*"),
+    ("Elba main", "main/elba-*"),
+    ("Elba adversarial (no policy)", "adversarial/rep*/elba-nopolicy-*"),
+    ("Elba adversarial (policy)", "adversarial/rep*/elba-policy-*"),
 ]
 
 

@@ -23,7 +23,7 @@ class Model:
     name: str
     provider: str
     agent_config: AgentConfig
-    camel_model: str | None = None  # None means typeguard only
+    camel_model: str | None = None  # None means elba only
     bedrock_model: str | None = None  # the Bedrock id, taken under --bedrock
 
 

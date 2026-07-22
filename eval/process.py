@@ -13,8 +13,8 @@ from config import Model, display
 from result import load_result
 
 SYSTEM_LABELS = {
-    ("typeguard", "policy"): "TypeGuard",
-    ("typeguard", "nopolicy"): "TypeGuard (no policy)",
+    ("elba", "policy"): "Elba",
+    ("elba", "nopolicy"): "Elba (no policy)",
     ("camel", "policy"): "CaMeL",
     ("camel", "nopolicy"): "CaMeL (no policy)",
 }
@@ -78,7 +78,7 @@ def security_frame(df: pd.DataFrame, suite: str) -> pd.DataFrame:
 
 
 def adversarial_frame(df: pd.DataFrame, suite: str) -> pd.DataFrame:
-    sub = df[(df["suite"] == suite) & (df["attack"] == "adversarial") & (df["system"] == "typeguard")]
+    sub = df[(df["suite"] == suite) & (df["attack"] == "adversarial") & (df["system"] == "elba")]
     grp = sub.groupby(["System", "Model"], observed=True)
     total = grp.size()
     completed = grp["utility"].sum()
@@ -154,7 +154,7 @@ def ci_table(df: pd.DataFrame, suites: list[str], models: dict[str, Model]) -> s
                 sub = df[(df["suite"] == suite) & (df["Model"] == disp)
                          & (df["variant"] == variant) & (df["attack"] == attack)]
                 key = ["task", "injection", "rep"]
-                tg = sub[sub["system"] == "typeguard"].set_index(key)["utility"]
+                tg = sub[sub["system"] == "elba"].set_index(key)["utility"]
                 cm = sub[sub["system"] == "camel"].set_index(key)["utility"]
                 common = tg.index.intersection(cm.index)
                 if common.empty:
@@ -166,7 +166,7 @@ def ci_table(df: pd.DataFrame, suites: list[str], models: dict[str, Model]) -> s
     if not rows:
         return "% no paired data yet\n"
     caption = (r"95\% confidence intervals for the difference in task completion rates "
-               r"(TypeGuard $-$ CaMeL), using Newcombe's score interval for paired proportions.")
+               r"(Elba $-$ CaMeL), using Newcombe's score interval for paired proportions.")
     body = pd.DataFrame(rows).to_latex(index=False, escape=False, caption=caption,
                                        label="tab:agentdojo-cis", column_format="lllr")
     return "% Requires \\usepackage{booktabs}\n" + body

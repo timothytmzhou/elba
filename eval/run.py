@@ -61,7 +61,7 @@ def run_benchmark(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
 
         run_camel(bench, model, logdir, benchmark_version, bedrock)
     else:
-        run_typeguard(bench, model, logdir, benchmark_version)
+        run_elba(bench, model, logdir, benchmark_version)
     print(f"[done] {slug(bench)}", flush=True)
 
 
@@ -101,7 +101,7 @@ def run_agentdojo_task(bench: Benchmark, model: Model, logdir: Path, benchmark_v
                                           benchmark_version=benchmark_version)
 
 
-def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
+def run_elba(bench: Benchmark, model: Model, logdir: Path, benchmark_version: str) -> None:
     from bridge import HaskellAgentPipeline
 
     private = logdir / f"rep{bench.rep}" / pipeline_name(bench) / ".agent" / slug(bench)
@@ -111,7 +111,7 @@ def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
     if bench.attack == "adversarial":
         agent_config = replace(agent_config, evalAdversarially=True)
     config.write_text(json.dumps(asdict(agent_config)))
-    cmd = [typeguard_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
+    cmd = [elba_exe(), "--suite", bench.suite] + (["--secure"] if bench.variant == "policy" else [])
     pipeline = HaskellAgentPipeline(cmd, pipeline_name(bench), str(config),
                                     str(private / "transcript.jsonl"), private / "llm")
     run_agentdojo_task(bench, model, logdir, benchmark_version, pipeline)
@@ -123,12 +123,12 @@ def run_typeguard(bench: Benchmark, model: Model, logdir: Path, benchmark_versio
     path.write_text(json.dumps(result))
 
 
-def build_typeguard() -> None:
+def build_elba() -> None:
     subprocess.run(["cabal", "build", "--write-ghc-environment-files=always", "agentdojo"],
                    cwd=REPO_ROOT, check=True)
 
 
-def typeguard_exe() -> str:
+def elba_exe() -> str:
     return subprocess.check_output(["cabal", "list-bin", "agentdojo"], cwd=REPO_ROOT,
                                    text=True).strip().splitlines()[-1]
 
@@ -137,7 +137,7 @@ def _worker_cmd(bench: Benchmark, config_path: str, logdir: Path, benchmark_vers
                 bedrock: bool) -> list[str]:
     args = ["worker", json.dumps(asdict(bench)), config_path, str(logdir), benchmark_version]
     args += ["--bedrock"] if bedrock else []
-    if bench.system == "typeguard":
+    if bench.system == "elba":
         return [sys.executable, __file__, *args]
     return camel_eval.worker_cmd(args)
 
@@ -171,8 +171,8 @@ def run_benchmarks(benchmarks: list[Benchmark], configs: dict[str, str], logdir:
                    build: bool = True, bedrock: bool = False) -> RunReport:
     if any(b.system == "camel" for b in benchmarks):
         camel_eval.ensure_checkout()
-    if build and any(b.system == "typeguard" for b in benchmarks):
-        build_typeguard()
+    if build and any(b.system == "elba" for b in benchmarks):
+        build_elba()
 
     def run_task(bench: Benchmark) -> Outcome:
         cmd = _worker_cmd(bench, configs[bench.model], logdir, benchmark_version, bedrock)
@@ -208,7 +208,7 @@ def main() -> int:
     ap.add_argument("--suites", default=",".join(SUITES), help="comma list")
     ap.add_argument("--attacks", default=",".join(ATTACKS),
                     help="comma list. empty runs only the benign baseline")
-    ap.add_argument("--systems", default="typeguard,camel")
+    ap.add_argument("--systems", default="elba,camel")
     ap.add_argument("--repeats", type=int, default=1, help="repetitions per task")
     ap.add_argument("--no-benign", action="store_true",
                     help="skip the benign baseline, e.g. the adversarial table has no Safe column")

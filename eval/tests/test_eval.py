@@ -16,7 +16,7 @@ from benchmark import (  # noqa: E402
 from config import AgentConfig, Model, load_model, on_bedrock  # noqa: E402
 from result import Result  # noqa: E402
 from bridge import to_jsonable  # noqa: E402
-from run import run_benchmarks, typeguard_exe  # noqa: E402
+from run import run_benchmarks, elba_exe  # noqa: E402
 from process import newcombe_paired_diff, utility_table  # noqa: E402
 
 
@@ -45,9 +45,9 @@ def test_expand_slack_counts():
     assert len({slug(a) for a in atoms}) == len(atoms)
 
 
-def test_expand_nonslack_has_no_typeguard_policy():
+def test_expand_nonslack_has_no_elba_policy():
     atoms = expand([model()], ["workspace"], [], repeats=1)
-    tg = {a.variant for a in atoms if a.system == "typeguard"}
+    tg = {a.variant for a in atoms if a.system == "elba"}
     cm = {a.variant for a in atoms if a.system == "camel"}
     assert tg == {"nopolicy"} and cm == {"policy", "nopolicy"}
 
@@ -55,14 +55,14 @@ def test_expand_nonslack_has_no_typeguard_policy():
 def test_pipeline_name_is_uniform():
     b = Benchmark("camel", "policy", "gpt-5.4-high", 1, "slack", "user_task_0")
     assert pipeline_name(b) == "camel-policy-gpt-5.4-high"
-    assert pipeline_name(Benchmark("typeguard", "nopolicy", "gpt-4o", 1, "slack", "t")) \
-        == "typeguard-nopolicy-gpt-4o"
+    assert pipeline_name(Benchmark("elba", "nopolicy", "gpt-4o", 1, "slack", "t")) \
+        == "elba-nopolicy-gpt-4o"
 
 
 def test_split_cached(tmp_path):
     m = model()
-    a1 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
-    a2 = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_1")
+    a1 = Benchmark("elba", "policy", m.name, 1, "slack", "user_task_0")
+    a2 = Benchmark("elba", "policy", m.name, 1, "slack", "user_task_1")
     p = result_path(a1, tmp_path)
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps({"utility": True, "security": True}))
@@ -77,7 +77,7 @@ def test_load_model(tmp_path):
     assert m.provider == "anthropic" and m.camel_model == "anthropic:claude-opus-4-7"
     assert m.agent_config.modelName == "claude-opus-4-7" and m.agent_config.seed == 1
     p.write_text(json.dumps({"model": "mistral:mistral-large"}))
-    assert load_model(p).camel_model is None  # unknown to camel, typeguard only
+    assert load_model(p).camel_model is None  # unknown to camel, elba only
 
 
 def test_on_bedrock():
@@ -115,7 +115,7 @@ PROGRAM = 'do { _ <- getWebpage "www.informations.com"; return "I read the page.
 @pytest.fixture(scope="session")
 def agent_exe():
     try:
-        return typeguard_exe()
+        return elba_exe()
     except (FileNotFoundError, subprocess.CalledProcessError):
         pytest.skip("the agentdojo binary cannot be built here")
 
@@ -138,8 +138,8 @@ def slack_run(tmp_path, agent_exe, mock_llm):
     m = model(llm_command=mock_llm(f"cat <<'CODE'\n{PROGRAM}\nCODE"))
     models = {m.name: m}
     benchmarks = [
-        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0"),
-        Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0",
+        Benchmark("elba", "policy", m.name, 1, "slack", "user_task_0"),
+        Benchmark("elba", "policy", m.name, 1, "slack", "user_task_0",
                   attack="important_instructions", injection_task_id="injection_task_1"),
     ]
     logdir = tmp_path / "logs"
@@ -152,11 +152,11 @@ def test_worker_end_to_end(slack_run):
     models, logdir, report = slack_run
     assert report.completed == 2
     benign = json.loads(
-        (logdir / "rep1/typeguard-policy-gpt-5.4-high/slack/user_task_0/none/none.json").read_text())
+        (logdir / "rep1/elba-policy-gpt-5.4-high/slack/user_task_0/none/none.json").read_text())
     assert benign["utility"] is True
     assert benign["tokens"] is None or "input" in benign["tokens"]
     attacked = json.loads(
-        (logdir / "rep1/typeguard-policy-gpt-5.4-high/slack/user_task_0/"
+        (logdir / "rep1/elba-policy-gpt-5.4-high/slack/user_task_0/"
                   "important_instructions/injection_task_1.json").read_text())
     assert attacked["utility"] is True
     assert attacked["security"] is False  # stub never performs the injection
@@ -186,7 +186,7 @@ fi""")
 
 def test_timeout_writes_failure(tmp_path, agent_exe, mock_llm):
     m = model(llm_command=mock_llm("sleep 60"))
-    bench = Benchmark("typeguard", "policy", m.name, 1, "slack", "user_task_0")
+    bench = Benchmark("elba", "policy", m.name, 1, "slack", "user_task_0")
     report = run_benchmarks([bench], configs_for(m, tmp_path), tmp_path / "logs", "v1.2.2",
                             timeout_s=5, max_workers=1, build=False)
     result = json.loads(result_path(bench, tmp_path / "logs").read_text())
@@ -201,7 +201,7 @@ def test_utility_table_full_matrix(tmp_path):
     attacks = ["direct", "important_instructions"]
     user_tasks, injection_tasks = suite_tasks("slack")
     rows = []
-    for system, variant in [("typeguard", "policy"), ("typeguard", "nopolicy"),
+    for system, variant in [("elba", "policy"), ("elba", "nopolicy"),
                             ("camel", "policy"), ("camel", "nopolicy")]:
         for ut in user_tasks:
             rows.append({"System": SYSTEM_LABELS[(system, variant)], "Model": "Gpt 5.4",
@@ -217,7 +217,7 @@ def test_utility_table_full_matrix(tmp_path):
     df = pd.DataFrame(rows)
     tex = utility_table(df, "slack")
     # All four system rows including the attacked utility cells.
-    for label in ["TypeGuard", "TypeGuard (no policy)", "CaMeL", "CaMeL (no policy)"]:
+    for label in ["Elba", "Elba (no policy)", "CaMeL", "CaMeL (no policy)"]:
         assert label in tex
     assert "21/21" in tex
     assert "105/105" in tex

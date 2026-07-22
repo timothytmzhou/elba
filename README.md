@@ -1,3 +1,7 @@
+Elba
+====
+This is the code for the paper "Language Based Agent Control".
+
 Installation
 ------------
 Install `llm`:
