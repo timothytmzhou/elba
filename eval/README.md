@@ -8,20 +8,35 @@ Prints the run plan, confirms (`--no-confirm` to skip), runs everything in paral
 
 ## Outputs (`<logdir>/results/`)
 - `dump.jsonl` — raw per-task records (verdicts, duration, tokens, transcript paths)
-- `table_<suite>.tex` — paste-ready paper table per suite
+- `utility_<suite>.tex`, `security_<suite>.tex`, `adversarial_<suite>.tex` — paste-ready paper tables
 - `confidence_intervals.tex` — TypeGuard − CaMeL paired-difference 95% CIs (Newcombe)
+
+## Checking the security verdicts
+`check_injections.py` re-derives the verdicts from the recordings in `data/` rather than trusting the stored ones. It rebuilds the injected environment, replays each run's tool calls, and applies agentdojo's own security check:
+```bash
+python eval/check_injections.py
+```
+```
+                                    runs  violations
+CaMeL main                          2375           0
+TypeGuard main                      2520           0
+TypeGuard adversarial (no policy)   2939         844
+TypeGuard adversarial (policy)      2938          28
+```
 
 ## Structure
 ```
-run.py         CLI plus run_benchmark / run_benchmarks
-config.py      model config types and loader
-benchmark.py   run matrix, result paths, the plan
-result.py      per-task result type and loader
-bridge.py      JSON protocol with the Haskell agent binary
-process.py     dump.jsonl, Newcombe CIs, LaTeX tables
-configs/       one JSON per model
-camel_eval/    self-contained CaMeL baseline
-tests/         pytest suite, no LLM calls
+run.py               CLI plus run_benchmark / run_benchmarks
+config.py            model config types and loader
+benchmark.py         run matrix, result paths, the plan
+result.py            per-task result type and loader
+bridge.py            JSON protocol with the Haskell agent binary
+process.py           dump.jsonl, Newcombe CIs, LaTeX tables
+check_injections.py  replays recordings through agentdojo's security check
+configs/             one JSON per model
+camel_eval/          self-contained CaMeL baseline
+data/                committed recordings and the result tables
+tests/               pytest suite, no LLM calls
 ```
 
 ## The run matrix

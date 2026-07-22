@@ -27,8 +27,9 @@ ATTACKS = list(ATTACK_LABELS)
 # One row per task evaluation, with the model and system order fixed as categoricals.
 def load_frame(logdir: Path, models: dict[str, Model]) -> pd.DataFrame:
     rows = []
-    for rep_dir in sorted(logdir.glob("rep*")):
-        rep = int(rep_dir.name[3:])
+    # A single repetition is stored flat, without the rep1 directory.
+    for rep_dir in sorted(logdir.glob("rep*")) or [logdir]:
+        rep = int(rep_dir.name[3:]) if rep_dir.name.startswith("rep") else 1
         for model in models.values():
             for system, variant in SYSTEM_LABELS:
                 stem = Benchmark(system, variant, model.name, rep, "", "")

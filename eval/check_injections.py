@@ -12,13 +12,22 @@ Notes:
 
 import argparse
 import ast
+import contextlib
 import copy
+import io
 import json
 from pathlib import Path
 
 import agentdojo.task_suite.load_suites  # noqa: F401
 from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
 from agentdojo.task_suite.load_suites import get_suite
+
+SWEEPS = [
+    ("CaMeL main", "main/camel-*"),
+    ("TypeGuard main", "main/typeguard-*"),
+    ("TypeGuard adversarial (no policy)", "adversarial/rep*/typeguard-nopolicy-*"),
+    ("TypeGuard adversarial (policy)", "adversarial/rep*/typeguard-policy-*"),
+]
 
 
 def _as_call(raw):
@@ -81,45 +90,44 @@ def violated(suite, task, messages, injections):
     return bool(task.security(output, pre_environment, post_environment))
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--recordings", nargs="+", required=True,
-                    help="recording trees, e.g. data/main/rep1/*+camel")
-    ap.add_argument("--suite", default="slack")
-    ap.add_argument("--benchmark-version", default="v1.2.1")
-    args = ap.parse_args()
-
-    suite = get_suite(args.benchmark_version, args.suite)
-    checked = 0
-    violations = []
-
-    for root in args.recordings:
-        for path in sorted(Path(root).glob("*/*/*/*.json")):
+def check(suite, roots):
+    checked = violations = 0
+    for root in roots:
+        for path in sorted(root.glob("*/*/*/*.json")):
             if any(part.startswith(".") for part in path.parts):
                 continue
             record = json.loads(path.read_text())
             injection_id = record.get("injection_task_id")
             task = suite.injection_tasks.get(injection_id) if injection_id else None
-            if task is None:
+            if task is None or record.get("security") is None:
                 continue
-            if record.get("security") is None:
-                continue
-            messages = record.get("messages") or []
             try:
-                success = violated(suite, task, messages, record.get("injections") or {})
+                success = violated(suite, task, record.get("messages") or [],
+                                   record.get("injections") or {})
             except Exception:
                 continue
             checked += 1
-            if success:
-                violations.append(path)
+            violations += success
+    return checked, violations
 
-    print(f"runs checked:     {checked}")
-    print(f"violations found: {len(violations)}")
-    if any("nopolicy" not in path.parts[-5] for path in violations):
-        print("note: violations under policy are false positives by AgentDojo "
-              "(manually reviewed)")
-    for path in violations:
-        print(f"  {path}")
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--data", default=str(Path(__file__).resolve().parent / "data"),
+                    help="directory holding the recordings")
+    ap.add_argument("--suite", default="slack")
+    ap.add_argument("--benchmark-version", default="v1.2.1")
+    args = ap.parse_args()
+
+    suite = get_suite(args.benchmark_version, args.suite)
+    data = Path(args.data)
+    width = max(len(name) for name, _ in SWEEPS)
+    print(f"{'':{width}}  {'runs':>5}  {'violations':>10}")
+    for name, pattern in SWEEPS:
+        # agentdojo's slack injection tasks print while checking, keep that out of the table
+        with contextlib.redirect_stdout(io.StringIO()):
+            checked, violations = check(suite, sorted(data.glob(pattern)))
+        print(f"{name:{width}}  {checked:>5}  {violations:>10}")
 
 
 if __name__ == "__main__":
