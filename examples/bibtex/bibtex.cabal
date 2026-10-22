@@ -1,7 +1,7 @@
 cabal-version: 3.0
 name:          bibtex
 version:       0.1.0.0
-synopsis:      DBLP-backed literature search sandbox
+synopsis:      Crossref-backed literature search sandbox
 license:       MIT
 build-type:    Simple
 
@@ -9,9 +9,21 @@ library
   exposed-modules:  LitSearch
   hs-source-dirs:   lib
   default-language: GHC2024
+  ghc-options:      -haddock
   build-depends:
     base >= 4.20 && < 5,
     aeson,
     bytestring,
-    process,
-    text
+    http-conduit,
+    network-uri
+
+executable litsearch
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  default-language: GHC2024
+  build-depends:
+    aeson,
+    base >= 4.20 && < 5,
+    bibtex,
+    bytestring,
+    core

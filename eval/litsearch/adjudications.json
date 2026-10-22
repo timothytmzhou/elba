@@ -1,0 +1,178 @@
+[
+ {
+  "system": "baseline-custom",
+  "task": "capability-security",
+  "key": "Miller2003CapabilityMyths",
+  "verdict": "ok",
+  "note": "Real work: Miller, Yee, Shapiro, Capability Myths Demolished, Johns Hopkins SRL tech report 2003. Tech reports are absent from the registries."
+ },
+ {
+  "system": "baseline-custom",
+  "task": "rowhammer",
+  "key": "seaborn2015exploiting",
+  "verdict": "ok",
+  "note": "Real work: Seaborn and Dullien, Google Project Zero post and Black Hat 2015 talk. Not a registry indexed publication."
+ },
+ {
+  "system": "baseline-custom",
+  "task": "tee",
+  "key": "anati2013innovative",
+  "verdict": "ok",
+  "note": "Real work: Anati, Gueron, Johnson, Scarlata, HASP 2013 workshop paper distributed without a registered DOI."
+ },
+ {
+  "system": "pai",
+  "task": "browser-security",
+  "key": "barth2008chromium",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Stanford tech report 2008, real"
+ },
+ {
+  "system": "pai",
+  "task": "capability-security",
+  "key": "MillerYeeShapiro2003",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Johns Hopkins SRL tech report 2003, real"
+ },
+ {
+  "system": "pai",
+  "task": "differential-privacy",
+  "key": "Apple2017LearningWithPrivacy",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Apple ML Journal 2017, real"
+ },
+ {
+  "system": "pai",
+  "task": "gradual-typing",
+  "key": "SiekTaha2006",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Scheme and Functional Programming Workshop 2006, real"
+ },
+ {
+  "system": "pai",
+  "task": "interpretability",
+  "key": "elhage2021mathematical",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Anthropic Transformer Circuits web publication 2021, real"
+ },
+ {
+  "system": "pai",
+  "task": "interpretability",
+  "key": "bricken2023towards",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Anthropic Transformer Circuits web publication 2023, real"
+ },
+ {
+  "system": "pai",
+  "task": "phishing",
+  "key": "sheng2009empirical",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: CEAS 2009 workshop paper, real"
+ },
+ {
+  "system": "pai",
+  "task": "post-quantum",
+  "key": "FalconSpec2020",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: NIST PQC round 3 specification document 2020, real"
+ },
+ {
+  "system": "pai",
+  "task": "secure-messaging",
+  "key": "Bhargavan2020FormalModelsMLS",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Inria research report on MLS, real"
+ },
+ {
+  "system": "pai",
+  "task": "smt-solvers",
+  "key": "BarrettDeMouraFontaine2015",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Chapter in All about Proofs, Proofs for All 2015, real"
+ },
+ {
+  "system": "pai",
+  "task": "tee",
+  "key": "anati2013innovative",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: HASP 2013 workshop paper without registered DOI, real"
+ },
+ {
+  "system": "pai",
+  "task": "web-tracking",
+  "key": "mowery2012pixelperfect",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: W2SP 2012 workshop paper, real"
+ },
+ {
+  "system": "baseline-custom",
+  "task": "gradual-typing",
+  "key": "SiekTaha2006",
+  "verdict": "ok",
+  "note": "Registry absent but existence and year hand verified: Scheme and Functional Programming Workshop 2006, real"
+ },
+ {
+  "system": "pai",
+  "task": "crdts",
+  "key": "shapiro2011comprehensive",
+  "verdict": "ok",
+  "note": "INRIA research report RR-7506, 2011, cited correctly; registry copies carry other dates"
+ },
+ {
+  "system": "pai",
+  "task": "distributed-consensus",
+  "key": "Castro1999PBFT",
+  "verdict": "ok",
+  "note": "OSDI 1999, cited correctly; registry matches are later journal versions"
+ },
+ {
+  "system": "pai",
+  "task": "side-channels-crypto",
+  "key": "Bernstein2005Cache",
+  "verdict": "ok",
+  "note": "Self published 2005 preprint, single author, cited correctly"
+ },
+ {
+  "system": "pai",
+  "task": "taint-analysis",
+  "key": "newsome2005taintcheck",
+  "verdict": "ok",
+  "note": "NDSS 2005, cited correctly"
+ },
+ {
+  "system": "pai",
+  "task": "distributed-consensus",
+  "key": "Lamport2001PaxosMadeSimple",
+  "verdict": "ok",
+  "note": "Cited DOI is the SIGACT News Dec 2001 distributed computing column (pp 34-58) that contains the paper (pp 51-58); the paper has no individual DOI"
+ },
+ {
+  "system": "baseline-custom",
+  "task": "capability-security",
+  "key": "Miller2008Caja",
+  "verdict": "ok",
+  "note": "Google Caja tech report 2008, cited correctly"
+ },
+ {
+  "system": "baseline-custom",
+  "task": "taint-analysis",
+  "key": "newsome2005taintcheck",
+  "verdict": "ok",
+  "note": "NDSS 2005, cited correctly"
+ },
+ {
+  "system": "baseline-custom",
+  "task": "state-machine-repl",
+  "key": "OkiLiskov1988",
+  "verdict": "wrong_fields",
+  "errors": "doi_wrong_paper",
+  "note": "Real paper (PODC 1988) but the cited DOI resolves to a different work"
+ },
+ {
+  "system": "pai",
+  "task": "ifc-languages",
+  "key": "SabelfeldSands2009",
+  "verdict": "ok",
+  "note": "Cited DOI 10.3233/JCS-2009-0352 correctly resolves to the JCS 2009 journal version of the same work; the entry uses the CSFW 2005 title wording"
+ }
+]
