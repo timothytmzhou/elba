@@ -1,5 +1,5 @@
 cabal-version: 3.0
-name:          core
+name:          elba
 version:       0.1.0.0
 synopsis:      Agent primitive for typed agents
 license:       MIT
@@ -40,7 +40,7 @@ test-suite test-llm
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    core
+    elba
 
 test-suite test-agent
   type:            exitcode-stdio-1.0
@@ -49,4 +49,4 @@ test-suite test-agent
   default-language: GHC2024
   build-depends:
     base >= 4.20 && < 5,
-    core
+    elba
