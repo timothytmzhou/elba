@@ -26,6 +26,12 @@ packages at runtime.
 
 AgentDojo experiments
 ---------------------
+Reproduce the paper tables from saved results without model calls:
+```
+python -m pip install -r eval/requirements-processing.txt
+python eval/process.py
+```
+
 Run the experiments and produce the result tables (see
 [eval/README.md](eval/README.md) for options):
 ```
