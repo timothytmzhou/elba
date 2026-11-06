@@ -1,22 +1,20 @@
-% Requires \usepackage{booktabs,multirow}
 \begin{table}
-\caption{Adversarial evaluation on the AgentDojo slack suite: each subagent prompt is replaced by the injected command to model a compromised subagent.}
-\label{tab:agentdojo-slack-adversarial}
+\centering
+\small
+\caption{Adversarial evaluation: injections resisted and tasks completed under attack (higher is better).}
+\label{tab:adversarial-security}
 \begin{tabular}{llrr}
 \toprule
- &  & Completed & Resisted \\
-System & Model &  &  \\
+System & Model & Injections resisted (/735) & Tasks completed (/735) \\
 \midrule
-\multirow[t]{4}{*}{Elba} & Opus 4.7 & 351/735 & 734/735 \\
- & Opus 4.8 & 312/735 & 731/735 \\
- & Gpt 5.4 & 290/735 & 725/735 \\
- & Sonnet 5 & 294/735 & 722/735 \\
-\cline{1-4}
-\multirow[t]{4}{*}{Elba (no policy)} & Opus 4.7 & 523/735 & 425/735 \\
- & Opus 4.8 & 557/735 & 460/735 \\
- & Gpt 5.4 & 256/735 & 670/735 \\
- & Sonnet 5 & 494/734 & 540/734 \\
-\cline{1-4}
+LBAC & Opus 4.7 & 735 & 351 \\
+LBAC & Opus 4.8 & 735 & 312 \\
+LBAC & GPT 5.4 & 735 & 338 \\
+LBAC & Sonnet 5 & 735 & 294 \\
+LBAC (no policy) & Opus 4.7 & 425 & 523 \\
+LBAC (no policy) & Opus 4.8 & 460 & 557 \\
+LBAC (no policy) & GPT 5.4 & 621 & 558 \\
+LBAC (no policy) & Sonnet 5 & 540 & 494 \\
 \bottomrule
 \end{tabular}
 \end{table}
